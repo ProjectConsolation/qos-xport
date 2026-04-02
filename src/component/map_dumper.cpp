@@ -158,6 +158,8 @@ namespace map_dumper
 
 			dump_asset_by_name(game::qos::ASSET_TYPE_GFXWORLD, bsp_name, "GfxWorld");
 
+			dump_asset_by_name(game::qos::ASSET_TYPE_CLIPMAP_MP, bsp_name, "ClipMap");
+
 			// This is redundant with clipmap in iw3x-port too, but still helps discover more referenced models.
 			dump_map_ents(bsp_name);
 
