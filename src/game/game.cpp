@@ -130,6 +130,16 @@ namespace game
 		InterlockedDecrement(lock);
 	}
 
+	void DB_SyncXAssets()
+	{
+		const auto func_loc = game_offset(0x103E1600);
+
+		__asm
+		{
+			call func_loc
+		}
+	}
+
 	void ConvertBounds(game::iw4::Bounds* bounds, game::qos::vec3_t mins, game::qos::vec3_t maxs)
 	{
 		for (int i = 0; i < 3; ++i)

@@ -77,11 +77,13 @@ namespace mapents
 								return;
 							}
 
-							const auto name = params[1];
+						const auto name = params[1];
 
-							auto header = game::DB_FindXAssetHeader(game::qos::ASSET_TYPE_CLIPMAP_MP, name);
-							if (!header.clipMap->mapEnts)
-							{
+						game::DB_SyncXAssets();
+
+						auto header = game::DB_FindXAssetHeader(game::qos::ASSET_TYPE_CLIPMAP_MP, name);
+						if (!header.clipMap->mapEnts)
+						{
 								console::error("dumpmapents failed on '%s'\n", name);
 								return;
 							}

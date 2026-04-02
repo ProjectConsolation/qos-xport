@@ -89,6 +89,8 @@ namespace clipmap
 
 					const auto name = params[1];
 
+					game::DB_SyncXAssets();
+
 					auto header = game::DB_FindXAssetHeader(game::qos::ASSET_TYPE_CLIPMAP_MP, name);
 					if (!header.clipMap)
 					{

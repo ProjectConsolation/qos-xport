@@ -245,6 +245,8 @@ namespace assethandler
 
 	bool dump_asset_by_name(const game::qos::XAssetType type, const std::string& name)
 	{
+		game::DB_SyncXAssets();
+
 		const auto header = game::DB_FindXAssetHeader(type, name.data());
 		if (!header.data || game::DB_IsXAssetDefault(type, name.data()))
 		{
@@ -256,6 +258,8 @@ namespace assethandler
 
 	std::size_t dump_all_assets_of_type(const game::qos::XAssetType type, const std::string& filter)
 	{
+		game::DB_SyncXAssets();
+
 		std::size_t dumped = 0;
 		const auto lowered_filter = utils::string::to_lower(filter);
 

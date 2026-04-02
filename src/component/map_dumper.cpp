@@ -148,6 +148,7 @@ namespace map_dumper
 			console::info("loading map '%s'...\n", name.data());
 			command::execute(utils::string::va("%s %s", is_singleplayer ? "loadzone" : "map", name.data()));
 			command::execute(utils::string::va("loadzone %s_load", name.data()));
+			game::DB_SyncXAssets();
 
 			// TODO: export sounds (Louve seems to have some big function for this, i'll do it later lol)
 			console::info("exporting all sounds...\n");
