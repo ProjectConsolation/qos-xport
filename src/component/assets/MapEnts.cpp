@@ -47,6 +47,21 @@ namespace mapents
 			return { iw4_asset };
 		}
 
+		void dump_referenced_models(game::iw4::MapEnts* ents)
+		{
+			if (!ents || !ents->entityString || ents->numEntityChars <= 1)
+			{
+				return;
+			}
+
+			Entities map_ents(ents->entityString, ents->numEntityChars);
+			const auto models = map_ents.GetModels();
+			for (const auto& model : models)
+			{
+				command::execute(utils::string::va("dumpxmodel %s", model.data()));
+			}
+		}
+
 		class component final : public component_interface
 		{
 		public:
@@ -73,6 +88,7 @@ namespace mapents
 
 							auto converted = mapents::convert(header.clipMap->mapEnts);
 							map_dumper::api->write(game::iw4::ASSET_TYPE_MAP_ENTS, converted);
+							dump_referenced_models(converted);
 
 							console::info("dumped '%s' for IW4\n", name);
 						});
@@ -86,7 +102,7 @@ namespace mapents
 
 			game::iw4::XAssetHeader convert_asset(game::qos::XAssetHeader header) override
 			{
-				return { convert(header.clipMap->mapEnts) };
+				return { convert(header.mapEnts) };
 			}
 		};
 	}

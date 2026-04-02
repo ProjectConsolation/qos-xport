@@ -1664,6 +1664,7 @@ namespace game::qos
 		Material* material;
 		GfxImage* image;
 		XModel* xmodel;
+		MapEnts* mapEnts;
 		ComWorld* comWorld;
 		//gameWorldSp* gameWorldSp;
 		gameWorldMp* gameWorldMp;

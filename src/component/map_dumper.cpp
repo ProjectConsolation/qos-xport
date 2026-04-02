@@ -4,6 +4,7 @@
 #include "component/assethandler.hpp"
 #include "component/command.hpp"
 #include "component/console.hpp"
+#include "component/entities.hpp"
 #include "component/map_dumper.hpp"
 #include "component/scheduler.hpp"
 
@@ -19,6 +20,45 @@ namespace map_dumper
 
 	namespace
 	{
+		bool dump_asset_by_name(const game::qos::XAssetType type, const std::string& name, const char* label)
+		{
+			console::info("exporting %s...\n", label);
+			if (!assethandler::dump_asset_by_name(type, name))
+			{
+				console::warn("failed to export %s '%s'\n", label, name.data());
+				return false;
+			}
+
+			return true;
+		}
+
+		bool dump_map_ents(const std::string& bsp_name)
+		{
+			console::info("exporting Entities...\n");
+
+			const auto header = game::DB_FindXAssetHeader(game::qos::ASSET_TYPE_CLIPMAP_MP, bsp_name.data());
+			if (!header.clipMap || !header.clipMap->mapEnts)
+			{
+				console::warn("failed to export entities for '%s'\n", bsp_name.data());
+				return false;
+			}
+
+			const auto dumped = assethandler::dump_asset(game::qos::ASSET_TYPE_MAP_ENTS, { header.clipMap->mapEnts });
+			if (!dumped)
+			{
+				return false;
+			}
+
+			Entities map_ents(header.clipMap->mapEnts->entityString, header.clipMap->mapEnts->numEntityChars);
+			const auto models = map_ents.GetModels();
+			for (const auto& model : models)
+			{
+				command::execute(utils::string::va("dumpxmodel %s", model.data()));
+			}
+
+			return true;
+		}
+
 		std::string api_read_file(const std::string& name)
 		{
 			/*
@@ -112,21 +152,23 @@ namespace map_dumper
 			// TODO: export sounds (Louve seems to have some big function for this, i'll do it later lol)
 			console::info("exporting all sounds...\n");
 
-			console::info("exporting ComWorld...\n");
-			command::execute(utils::string::va("dumpcomworld %s", bsp_name.data()));
+			dump_asset_by_name(game::qos::ASSET_TYPE_COMWORLD, bsp_name, "ComWorld");
 
-			console::info("exporting GameWorld...\n");
-			command::execute(utils::string::va("dumpgameworld %s", bsp_name.data()));
+			dump_asset_by_name(game::qos::ASSET_TYPE_gameWORLD_MP, bsp_name, "GameWorld");
 
-			// this is redundant with clipmap but allows exporting more models
-			console::info("exporting Entities...\n");
-			command::execute(utils::string::va("dumpmapents %s", bsp_name.data()));
+			dump_asset_by_name(game::qos::ASSET_TYPE_GFXWORLD, bsp_name, "GfxWorld");
 
-			// TODO:
-			/*
-			console::info("exporting GfxWorld...\n");
-			command::execute(utils::string::va("dumpgfxworld %s", bsp_name.data()));
-			*/
+			// This is redundant with clipmap in iw3x-port too, but still helps discover more referenced models.
+			dump_map_ents(bsp_name);
+
+			dump_asset_by_name(game::qos::ASSET_TYPE_RAWFILE, utils::string::va("vision/%s.vision", name.data()), "vision");
+			dump_asset_by_name(game::qos::ASSET_TYPE_RAWFILE, utils::string::va("sun/%s.sun", name.data()), "sun");
+			dump_asset_by_name(game::qos::ASSET_TYPE_RAWFILE, utils::string::va("maps/%s%s.gsc", is_singleplayer ? "" : "mp/", name.data()), "map gsc");
+			dump_asset_by_name(game::qos::ASSET_TYPE_RAWFILE, utils::string::va("maps/%s%s_fx.gsc", is_singleplayer ? "" : "mp/", name.data()), "map fx gsc");
+			dump_asset_by_name(game::qos::ASSET_TYPE_RAWFILE, utils::string::va("maps/createfx/%s_fx.gsc", name.data()), "createfx gsc");
+
+			dump_asset_by_name(game::qos::ASSET_TYPE_MATERIAL, utils::string::va("compass_map_%s", name.data()), "compass material");
+			dump_asset_by_name(game::qos::ASSET_TYPE_MATERIAL, "$levelbriefing", "loadscreen material");
 		}
 	}
 
