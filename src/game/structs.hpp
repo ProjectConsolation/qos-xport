@@ -146,7 +146,7 @@ namespace game::qos
 		CollisionPartition* partitions;
 		int aabbTreeCount;
 		CollisionAabbTree* aabbTrees;
-		char pad_0084[8];
+		char pad_0084[16];
 		unsigned int numSubModels; //0x0094
 		cmodel_t* cmodels; //0x0098
 		unsigned short numBrushes; //0x009C

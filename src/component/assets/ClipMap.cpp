@@ -275,7 +275,7 @@ namespace clipmap
 					std::memcpy(iw4_asset->aabbTrees[i].halfSize, clipmap->aabbTrees[i].halfSize, sizeof(iw4_asset->aabbTrees[i].halfSize));
 					iw4_asset->aabbTrees[i].materialIndex = clipmap->aabbTrees[i].materialIndex;
 					iw4_asset->aabbTrees[i].childCount = clipmap->aabbTrees[i].childCount;
-					iw4_asset->aabbTrees[i].u = clipmap->aabbTrees[i].u;
+					iw4_asset->aabbTrees[i].u.firstChildIndex = clipmap->aabbTrees[i].u.firstChildIndex;
 				}
 			}
 
@@ -378,7 +378,7 @@ namespace clipmap
 					auto converted = clipmap::convert(header.clipMap);
 					map_dumper::api->write(game::iw4::ASSET_TYPE_CLIPMAP_MP, converted);
 
-					console::warn("dumpclipmap exported a minimal clipmap for '%s'\n", name);
+					console::info("dumpclipmap exported clipmap data for '%s'\n", name);
 				};
 
 				command::add("dumpclipmap", dump_command);
