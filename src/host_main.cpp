@@ -365,6 +365,9 @@ namespace
 			host_print("patch detour 0x104035F0");
 			g_sound_init_patch.create(game::game_offset(0x104035F0), sound_init_skip_stub);
 			host_print("patch detour 0x104035F0 done");
+			host_print("patch jump 0x103F9B5A -> 0x103F9B85");
+			utils::hook::jump(game::game_offset(0x103F9B5A), game::game_offset(0x103F9B85));
+			host_print("patch jump 0x103F9B5A done");
 			host_print("patch gfxConfig callsite 0x103F9A80");
 			utils::hook::set<std::uint8_t>(game::game_offset(0x103F9A80), 0xB0);
 			utils::hook::set<std::uint8_t>(game::game_offset(0x103F9A81), 0x01);
