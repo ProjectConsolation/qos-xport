@@ -28,6 +28,7 @@ namespace
 	utils::hook::detour g_session_start_patch;
 	utils::hook::detour g_client_disconnect_patch;
 	utils::hook::detour g_exec_config_patch;
+	utils::hook::detour g_localize_lookup_patch;
 	utils::hook::detour g_engine_printf_hook;
 	std::mutex g_output_mutex;
 	std::atomic_bool g_window_watch_kill = false;
@@ -110,6 +111,19 @@ namespace
 
 	void __cdecl client_disconnect_skip_stub()
 	{
+	}
+
+	const char* __fastcall localize_lookup_filter_stub(const char* key)
+	{
+		if (runtime::is_standalone_xport_mode() && key)
+		{
+			if (!_stricmp(key, "EXE_DISCONNECTED_FROM_SERVER"))
+			{
+				return "^1DISCONNECTED_FROM_SERVER^7";
+			}
+		}
+
+		return g_localize_lookup_patch.invoke<const char*>(const_cast<char*>(key));
 	}
 
 	char __cdecl exec_config_filter_stub(char* name, int a2, int a3, int a4)
@@ -415,6 +429,9 @@ namespace
 			host_print("patch detour 0x1031E840");
 			g_client_disconnect_patch.create(game::game_offset(0x1031E840), client_disconnect_skip_stub);
 			host_print("patch detour 0x1031E840 done");
+			host_print("patch detour 0x102DA9B0");
+			g_localize_lookup_patch.create(game::game_offset(0x102DA9B0), localize_lookup_filter_stub);
+			host_print("patch detour 0x102DA9B0 done");
 			host_print("patch detour 0x103F5820");
 			g_exec_config_patch.create(game::game_offset(0x103F5820), exec_config_filter_stub);
 			host_print("patch detour 0x103F5820 done");
