@@ -53,6 +53,11 @@ namespace
 		append_launcher_log(message);
 	}
 
+	void launcher_debug(const std::string& message)
+	{
+		launcher_print(message);
+	}
+
 	int fail_and_wait(const char* message)
 	{
 		std::fprintf(stderr, "[QoS-xport]: %s", message);
@@ -291,6 +296,7 @@ namespace
 		const auto local_module = LoadLibraryExA(dll_path.c_str(), nullptr, DONT_RESOLVE_DLL_REFERENCES);
 		if (!local_module)
 		{
+			launcher_debug("LoadLibraryExA failed for export scan (" + std::to_string(GetLastError()) + ")");
 			return 0;
 		}
 
@@ -299,10 +305,17 @@ namespace
 			FreeLibrary(local_module);
 		});
 
-		const auto local_export = reinterpret_cast<uintptr_t>(GetProcAddress(local_module, export_name));
+		uintptr_t local_export = reinterpret_cast<uintptr_t>(GetProcAddress(local_module, export_name));
 		if (!local_export)
 		{
-			return 0;
+			launcher_debug(std::string("GetProcAddress failed for '") + export_name + "', trying stdcall decoration");
+			const auto decorated_name = std::string("_") + export_name + "@4";
+			local_export = reinterpret_cast<uintptr_t>(GetProcAddress(local_module, decorated_name.c_str()));
+			if (!local_export)
+			{
+				launcher_debug(std::string("GetProcAddress also failed for '") + decorated_name + "'");
+				return 0;
+			}
 		}
 
 		const auto local_base = reinterpret_cast<uintptr_t>(local_module);
@@ -314,10 +327,10 @@ namespace
 		const auto remote_init = get_remote_export_address(dll_path, remote_base, "qos_xport_remote_init");
 		if (!remote_init)
 		{
-			append_launcher_log("failed to resolve remote export qos_xport_remote_init");
+			launcher_debug("failed to resolve remote export qos_xport_remote_init");
 			return false;
 		}
-		append_launcher_log("resolved qos_xport_remote_init at 0x" + std::to_string(remote_init));
+		launcher_debug("resolved qos_xport_remote_init at 0x" + std::to_string(remote_init));
 
 		const auto thread = CreateRemoteThread(
 			process,
@@ -330,7 +343,7 @@ namespace
 		);
 		if (!thread)
 		{
-			append_launcher_log("CreateRemoteThread for runtime init failed (" + std::to_string(GetLastError()) + ")");
+			launcher_debug("CreateRemoteThread for runtime init failed (" + std::to_string(GetLastError()) + ")");
 			return false;
 		}
 
@@ -341,14 +354,14 @@ namespace
 
 		if (WaitForSingleObject(thread, 15000) != WAIT_OBJECT_0)
 		{
-			append_launcher_log("wait for runtime init thread failed/timed out (" + std::to_string(GetLastError()) + ")");
+			launcher_debug("wait for runtime init thread failed/timed out (" + std::to_string(GetLastError()) + ")");
 			return false;
 		}
 
 		DWORD exit_code = 0;
 		if (!GetExitCodeThread(thread, &exit_code))
 		{
-			append_launcher_log("GetExitCodeThread for runtime init failed (" + std::to_string(GetLastError()) + ")");
+			launcher_debug("GetExitCodeThread for runtime init failed (" + std::to_string(GetLastError()) + ")");
 			return false;
 		}
 
