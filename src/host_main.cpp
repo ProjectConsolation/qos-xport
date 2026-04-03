@@ -5,9 +5,15 @@
 #include "game/game.hpp"
 
 #include <iostream>
+#include <utils/hook.hpp>
 
 namespace
 {
+	int __stdcall ret_one(DWORD*, int)
+	{
+		return 1;
+	}
+
 	std::filesystem::path get_host_log_path()
 	{
 		char path[MAX_PATH]{};
@@ -115,8 +121,14 @@ namespace
 		{
 			return fail_and_wait("failed to load jb_mp_s.dll (" + std::to_string(GetLastError()) + ")");
 		}
+		game::mp_dll = module;
 
 		host_print("loaded jb_mp_s.dll");
+
+		host_print("applying early xlive/profile bypass patches");
+		utils::hook::jump(game::game_offset(0x10240B30), ret_one);
+		utils::hook::jump(game::game_offset(0x10240A30), ret_one);
+		utils::hook::nop(game::game_offset(0x102489A1), 5);
 
 		const auto start_main_mp = GetProcAddress(module, "startMainMP");
 		if (!start_main_mp)
