@@ -19,7 +19,9 @@ namespace
 
 	std::filesystem::path get_launcher_log_path()
 	{
-		auto path = std::filesystem::current_path() / "qos-xport";
+		char module_path[MAX_PATH]{};
+		GetModuleFileNameA(nullptr, module_path, MAX_PATH);
+		auto path = std::filesystem::path(module_path).parent_path() / "qos-xport";
 		std::error_code ec;
 		std::filesystem::create_directories(path, ec);
 		return path / "launcher.log";

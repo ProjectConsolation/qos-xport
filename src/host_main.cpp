@@ -16,6 +16,9 @@ namespace
 	utils::hook::detour g_splash_patch;
 	utils::hook::detour g_xnaddr_patch;
 	utils::hook::detour g_net_init_patch;
+	std::atomic_bool g_window_watch_kill = false;
+	std::atomic_bool g_window_hidden_logged = false;
+	std::thread g_window_watch_thread;
 
 	__declspec(naked) void xlive_ret_one_stub()
 	{
@@ -37,7 +40,7 @@ namespace
 
 	void* __cdecl xnaddr_success_stub()
 	{
-		return game::game_offset(0x115FA0D4);
+		return reinterpret_cast<void*>(game::game_offset(0x115FA0D4));
 	}
 
 	void __cdecl net_init_skip_stub()
@@ -174,6 +177,31 @@ namespace
 		return static_cast<DWORD>(call_start_main_mp(entry, 0, 0, GetModuleHandleA(nullptr), 0, 0, 0, 0, 0));
 	}
 
+	void hide_xport_windows_loop()
+	{
+		while (!g_window_watch_kill.load())
+		{
+			if (const auto window = FindWindowA("JB_MP", nullptr))
+			{
+				ShowWindow(window, SW_HIDE);
+				SetWindowPos(window, HWND_BOTTOM, -32000, -32000, 1, 1, SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+
+				if (!g_window_hidden_logged.exchange(true))
+				{
+					host_print("hid JB_MP window for standalone xport mode");
+				}
+			}
+
+			if (const auto splash = FindWindowA("007 Splash Screen", nullptr))
+			{
+				ShowWindow(splash, SW_HIDE);
+				SetWindowPos(splash, HWND_BOTTOM, -32000, -32000, 1, 1, SWP_NOACTIVATE | SWP_NOOWNERZORDER);
+			}
+
+			Sleep(250);
+		}
+	}
+
 	int run_standalone_mode()
 	{
 		const auto log_path = get_host_log_path();
@@ -236,9 +264,18 @@ namespace
 
 		host_print("resolved startMainMP export");
 
+		g_window_watch_kill = false;
+		g_window_hidden_logged = false;
+		g_window_watch_thread = std::thread(hide_xport_windows_loop);
+
 		const auto thread = CreateThread(nullptr, 0, standalone_engine_thread, start_main_mp, 0, nullptr);
 		if (!thread)
 		{
+			g_window_watch_kill = true;
+			if (g_window_watch_thread.joinable())
+			{
+				g_window_watch_thread.join();
+			}
 			return fail_and_wait("failed to create standalone engine thread (" + std::to_string(GetLastError()) + ")");
 		}
 
@@ -274,6 +311,11 @@ namespace
 		}
 
 		runtime::shutdown();
+		g_window_watch_kill = true;
+		if (g_window_watch_thread.joinable())
+		{
+			g_window_watch_thread.join();
+		}
 		WaitForSingleObject(thread, 1000);
 
 		DWORD exit_code = 0;
