@@ -12,14 +12,14 @@ namespace game
 	class symbol
 	{
 	public:
-		symbol(const size_t mp_address)
-			: mp_object_(reinterpret_cast<T*>(mp_address))
+		symbol(const size_t ida_address)
+			: ida_address_(ida_address)
 		{
 		}
 
 		T* get() const
 		{
-			return reinterpret_cast<T*>((uint64_t)mp_object_);
+			return reinterpret_cast<T*>(game_offset(static_cast<uintptr_t>(ida_address_)));
 		}
 
 		operator T* () const
@@ -33,7 +33,7 @@ namespace game
 		}
 
 	private:
-		T* mp_object_;
+		size_t ida_address_;
 	};
 
 	void Cbuf_AddText(int controller, const char* text);

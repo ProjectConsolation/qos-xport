@@ -4,6 +4,8 @@
 #include "runtime.hpp"
 #include "game/game.hpp"
 
+#include <iostream>
+
 namespace
 {
 	std::filesystem::path get_host_log_path()
