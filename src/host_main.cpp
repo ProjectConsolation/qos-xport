@@ -19,6 +19,7 @@ namespace
 	utils::hook::detour g_d3d_interface_patch;
 	utils::hook::detour g_d3d_device_patch;
 	utils::hook::detour g_d3d_queries_patch;
+	utils::hook::detour g_renderer_choice_patch;
 	utils::hook::detour g_engine_printf_hook;
 	std::atomic_bool g_window_watch_kill = false;
 	std::atomic_bool g_window_hidden_logged = false;
@@ -66,6 +67,10 @@ namespace
 		return 1;
 	}
 
+	void __fastcall renderer_choice_skip_stub(void*)
+	{
+	}
+
 	std::filesystem::path get_host_log_path()
 	{
 		char path[MAX_PATH]{};
@@ -76,10 +81,10 @@ namespace
 		return base / "launcher.log";
 	}
 
-	void append_host_log(const std::string& message)
+	void append_log_line(const std::string& line)
 	{
-		const auto line = "[host] " + message + "\r\n";
-		OutputDebugStringA(line.c_str());
+		const auto full_line = line + "\r\n";
+		OutputDebugStringA(full_line.c_str());
 
 		const auto path = get_host_log_path();
 		const auto handle = CreateFileA(
@@ -103,7 +108,7 @@ namespace
 		});
 
 		DWORD bytes_written = 0;
-		WriteFile(handle, line.data(), static_cast<DWORD>(line.size()), &bytes_written, nullptr);
+		WriteFile(handle, full_line.data(), static_cast<DWORD>(full_line.size()), &bytes_written, nullptr);
 	}
 
 	std::string format_message(va_list* ap, const char* message)
@@ -122,26 +127,26 @@ namespace
 	{
 		std::printf("[QoS-xport]: %s\n", message.c_str());
 		std::fflush(stdout);
-		append_host_log(message);
+		append_log_line("[host] " + message);
 	}
 
 	void engine_print(const std::string& message)
 	{
 		auto trimmed = message;
 		trimmed.erase(std::remove(trimmed.begin(), trimmed.end(), '\r'), trimmed.end());
+		while (!trimmed.empty() && trimmed.back() == '\n')
+		{
+			trimmed.pop_back();
+		}
 		if (trimmed.empty())
 		{
 			return;
 		}
 
-		std::printf("[engine] %s", trimmed.c_str());
-		if (trimmed.back() != '\n')
-		{
-			std::printf("\n");
-		}
+		std::printf("[engine] %s\n", trimmed.c_str());
 		std::fflush(stdout);
 
-		append_host_log("[engine] " + trimmed);
+		append_log_line("[engine] " + trimmed);
 	}
 
 	void engine_printf_stub(int channel, const char* fmt, ...)
@@ -157,7 +162,7 @@ namespace
 
 	void __cdecl host_terminate_handler()
 	{
-		append_host_log("CRT terminate handler invoked");
+		append_log_line("[host] CRT terminate handler invoked");
 		ExitProcess(0xE0000001);
 	}
 
@@ -187,7 +192,7 @@ namespace
 			message += std::to_string(line);
 		}
 
-		append_host_log(message);
+		append_log_line("[host] " + message);
 	}
 
 	int fail_and_wait(const std::string& message)
@@ -315,6 +320,9 @@ namespace
 			host_print("patch detour 0x103BDB50");
 			g_d3d_queries_patch.create(game::game_offset(0x103BDB50), d3d_queries_skip_stub);
 			host_print("patch detour 0x103BDB50 done");
+			host_print("patch detour 0x103BE750");
+			g_renderer_choice_patch.create(game::game_offset(0x103BE750), renderer_choice_skip_stub);
+			host_print("patch detour 0x103BE750 done");
 			host_print("patch detour 0x103F6400");
 			g_engine_printf_hook.create(game::game_offset(0x103F6400), engine_printf_stub);
 			host_print("patch detour 0x103F6400 done");
