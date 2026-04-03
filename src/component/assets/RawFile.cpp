@@ -29,11 +29,16 @@ namespace rawfile
 		}
 	}
 
-	class component final : public component_interface
-	{
-	public:
-		void post_load() override
+		class component final : public component_interface
 		{
+		public:
+			bool is_supported() override
+			{
+				return false;
+			}
+
+			void post_load() override
+			{
 			scheduler::once([&]()
 			{
 				command::add("dumprawfile", [](const command::params& params)

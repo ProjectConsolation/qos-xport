@@ -16,23 +16,22 @@ namespace
 	bool runtime_initialized = false;
 	bool runtime_log_cleared = false;
 
-	std::filesystem::path get_runtime_log_path()
+	std::filesystem::path get_launcher_log_path()
 	{
 		auto path = std::filesystem::current_path() / "qos-xport";
 		std::error_code ec;
 		std::filesystem::create_directories(path, ec);
-		return path / "runtime.log";
+		return path / "launcher.log";
 	}
 
 	void log_runtime_message(const std::string& message)
 	{
-		const auto line = message + "\r\n";
+		const auto line = "[runtime] " + message + "\r\n";
 		OutputDebugStringA(line.c_str());
 
-		const auto path = get_runtime_log_path();
+		const auto path = get_launcher_log_path();
 		if (!runtime_log_cleared)
 		{
-			DeleteFileA(path.string().c_str());
 			runtime_log_cleared = true;
 		}
 

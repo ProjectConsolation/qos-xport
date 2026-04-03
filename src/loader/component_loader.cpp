@@ -3,20 +3,20 @@
 
 namespace
 {
-	std::filesystem::path get_runtime_log_path()
+	std::filesystem::path get_launcher_log_path()
 	{
 		auto path = std::filesystem::current_path() / "qos-xport";
 		std::error_code ec;
 		std::filesystem::create_directories(path, ec);
-		return path / "runtime.log";
+		return path / "launcher.log";
 	}
 
 	void log_component_message(const std::string& message)
 	{
-		const auto line = message + "\r\n";
+		const auto line = "[runtime] " + message + "\r\n";
 		OutputDebugStringA(line.c_str());
 
-		const auto path = get_runtime_log_path();
+		const auto path = get_launcher_log_path();
 		const auto handle = CreateFileA(
 			path.string().c_str(),
 			FILE_APPEND_DATA,
@@ -52,6 +52,8 @@ bool component_loader::post_start()
 	static auto handled = false;
 	if (handled) return true;
 	handled = true;
+
+	clean();
 
 	try
 	{

@@ -65,6 +65,11 @@ namespace mapents
 		class component final : public component_interface
 		{
 		public:
+			bool is_supported() override
+			{
+				return false;
+			}
+
 			void post_load() override
 			{
 				scheduler::once([&]()
