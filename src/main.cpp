@@ -7,6 +7,9 @@ namespace
 {
 	DWORD WINAPI async_runtime_init(LPVOID)
 	{
+		// Give the MP host a moment to finish bootstrapping before we start
+		// installing hooks and components from the export runtime.
+		Sleep(5000);
 		return runtime::initialize(true) ? TRUE : FALSE;
 	}
 }
