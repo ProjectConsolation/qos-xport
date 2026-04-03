@@ -87,7 +87,7 @@ end
 dependencies.load()
 
 workspace "qos-exp"
-	startproject "qos-exp"
+	startproject "QoS-xport"
 	location "./build"
 	objdir "%{wks.location}/obj/%{cfg.buildcfg}"
 	targetdir "%{wks.location}/bin/%{cfg.buildcfg}"
@@ -164,12 +164,13 @@ project "d3d9" -- dll we are using to hook into the game
 		pchheader "std_include.hpp"
 		pchsource "src/std_include.cpp"
 
-		dependencies.imports()
+	dependencies.imports()
 
 	project "qos-xport"
 		kind "SharedLib"
 		language "C++"
 		targetname "qos-xport"
+		defines { "QOS_XPORT_AUTO_INIT" }
 
 		files
 		{
@@ -180,6 +181,40 @@ project "d3d9" -- dll we are using to hook into the game
 
 		removefiles
 		{
+			"./src/sdllp.cpp",
+		}
+
+		includedirs
+		{
+			"%{prj.location}/src",
+			"./src",
+		}
+
+		resincludedirs
+		{
+			"$(ProjectDir)src"
+		}
+
+		pchheader "std_include.hpp"
+		pchsource "src/std_include.cpp"
+
+		dependencies.imports()
+
+	project "QoS-xport"
+		kind "ConsoleApp"
+		language "C++"
+		targetname "QoS-xport"
+
+		files
+		{
+			"./src/**.h",
+			"./src/**.hpp",
+			"./src/**.cpp",
+		}
+
+		removefiles
+		{
+			"./src/main.cpp",
 			"./src/sdllp.cpp",
 		}
 
