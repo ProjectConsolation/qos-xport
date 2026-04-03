@@ -16,6 +16,9 @@ namespace
 	utils::hook::detour g_splash_patch;
 	utils::hook::detour g_xnaddr_patch;
 	utils::hook::detour g_net_init_patch;
+	utils::hook::detour g_d3d_interface_patch;
+	utils::hook::detour g_d3d_device_patch;
+	utils::hook::detour g_d3d_queries_patch;
 	std::atomic_bool g_window_watch_kill = false;
 	std::atomic_bool g_window_hidden_logged = false;
 	std::thread g_window_watch_thread;
@@ -45,6 +48,21 @@ namespace
 
 	void __cdecl net_init_skip_stub()
 	{
+	}
+
+	char __cdecl d3d_interface_skip_stub()
+	{
+		return 1;
+	}
+
+	int __cdecl d3d_device_skip_stub(int, int, int)
+	{
+		return 0;
+	}
+
+	char __cdecl d3d_queries_skip_stub()
+	{
+		return 1;
 	}
 
 	std::filesystem::path get_host_log_path()
@@ -245,6 +263,15 @@ namespace
 			host_print("patch detour 0x10244890");
 			g_net_init_patch.create(game::game_offset(0x10244890), net_init_skip_stub);
 			host_print("patch detour 0x10244890 done");
+			host_print("patch detour 0x103BEC80");
+			g_d3d_interface_patch.create(game::game_offset(0x103BEC80), d3d_interface_skip_stub);
+			host_print("patch detour 0x103BEC80 done");
+			host_print("patch detour 0x103BD850");
+			g_d3d_device_patch.create(game::game_offset(0x103BD850), d3d_device_skip_stub);
+			host_print("patch detour 0x103BD850 done");
+			host_print("patch detour 0x103BDB50");
+			g_d3d_queries_patch.create(game::game_offset(0x103BDB50), d3d_queries_skip_stub);
+			host_print("patch detour 0x103BDB50 done");
 			host_print("early patches applied");
 		}
 		catch (const std::exception& error)
