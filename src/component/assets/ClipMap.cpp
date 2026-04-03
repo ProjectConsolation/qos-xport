@@ -16,6 +16,24 @@ namespace clipmap
 {
 	namespace
 	{
+		void log_clipmap_stats(const game::qos::clipMap_t* clipmap)
+		{
+			if (!clipmap)
+			{
+				return;
+			}
+
+			console::info(
+				"clipmap stats: smodels=%u materials=%u brushsides=%u leafs=%u submodels=%u brushes=%hu\n",
+				clipmap->numStaticModels,
+				clipmap->numMaterials,
+				clipmap->numBrushSides,
+				clipmap->numLeafs,
+				clipmap->numSubModels,
+				clipmap->numBrushes
+			);
+		}
+
 		void add_stage(game::iw4::MapEnts* map_ents)
 		{
 			if (!map_ents)
@@ -97,6 +115,8 @@ namespace clipmap
 						console::error("dumpclipmap failed on '%s'\n", name);
 						return;
 					}
+
+					log_clipmap_stats(header.clipMap);
 
 					auto converted = clipmap::convert(header.clipMap);
 					map_dumper::api->write(game::iw4::ASSET_TYPE_CLIPMAP_MP, converted);

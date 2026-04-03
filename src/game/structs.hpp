@@ -115,10 +115,36 @@ namespace game::qos
 		void* materials;
 		unsigned int numBrushSides;
 		cbrushside_t* brushsides;
-		char pad_0028[108]; //0x0028
+		unsigned int numBrushEdges;
+		char* brushEdges;
+		unsigned int numNodes;
+		void* nodes;
+		unsigned int numLeafs;
+		cLeaf_t* leafs;
+		unsigned int leafbrushNodesCount;
+		void* leafbrushNodes;
+		unsigned int numLeafBrushes;
+		unsigned short* leafbrushes;
+		unsigned int numLeafSurfaces;
+		unsigned int* leafsurfaces;
+		unsigned int vertCount;
+		vec3_t* verts;
+		int triCount;
+		unsigned short* triIndices;
+		char* triEdgeIsWalkable;
+		int borderCount;
+		void* borders;
+		int partitionCount;
+		void* partitions;
+		char pad_0084[16];
 		unsigned int numSubModels; //0x0094
 		cmodel_t* cmodels; //0x0098
-		char pad_009C[24]; //0x009C
+		unsigned short numBrushes; //0x009C
+		unsigned short pad_009E;
+		void* brushes; //0x00A0
+		Bounds* brushBounds; //0x00A4
+		int* brushContents; //0x00A8
+		char pad_00AC[8];
 		MapEnts* mapEnts; //0xB4
 		char pad_00B8[140]; //0x00B8
 	}; static_assert(sizeof(clipMap_t) == 0x144);
