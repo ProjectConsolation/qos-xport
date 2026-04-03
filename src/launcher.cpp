@@ -62,9 +62,9 @@ namespace
 
 	void launcher_print(const std::string& message)
 	{
-		std::printf("[QoS-xport]: %s\n", message.c_str());
-		std::fflush(stdout);
-		append_launcher_log(message);
+	std::printf("[QoS-xport]: %s\n", message.c_str());
+	std::fflush(stdout);
+	append_launcher_log(message);
 	}
 
 	void launcher_debug(const std::string& message)
@@ -305,124 +305,6 @@ namespace
 		return static_cast<uintptr_t>(exit_code);
 	}
 
-	uintptr_t get_remote_export_address(const std::string& dll_path, const uintptr_t remote_base, const char* export_name)
-	{
-		const auto local_module = LoadLibraryExA(dll_path.c_str(), nullptr, DONT_RESOLVE_DLL_REFERENCES);
-		if (!local_module)
-		{
-			launcher_debug("LoadLibraryExA failed for export scan (" + std::to_string(GetLastError()) + ")");
-			return 0;
-		}
-
-		const auto free_module = gsl::finally([&]()
-		{
-			FreeLibrary(local_module);
-		});
-
-		uintptr_t local_export = reinterpret_cast<uintptr_t>(GetProcAddress(local_module, export_name));
-		if (!local_export)
-		{
-			launcher_debug(std::string("GetProcAddress failed for '") + export_name + "', trying stdcall decoration");
-			const auto decorated_name = std::string("_") + export_name + "@4";
-			local_export = reinterpret_cast<uintptr_t>(GetProcAddress(local_module, decorated_name.c_str()));
-			if (!local_export)
-			{
-				launcher_debug(std::string("GetProcAddress also failed for '") + decorated_name + "'");
-				return 0;
-			}
-		}
-
-		const auto local_base = reinterpret_cast<uintptr_t>(local_module);
-		return remote_base + (local_export - local_base);
-	}
-
-	bool call_remote_init(const HANDLE process, const std::string& dll_path, const uintptr_t remote_base)
-	{
-		const auto remote_init = get_remote_export_address(dll_path, remote_base, "qos_xport_remote_init");
-		if (!remote_init)
-		{
-			launcher_debug("failed to resolve remote export qos_xport_remote_init");
-			return false;
-		}
-		launcher_debug("resolved qos_xport_remote_init at 0x" + std::to_string(remote_init));
-
-		HANDLE thread = CreateRemoteThread(
-			process,
-			nullptr,
-			0,
-			reinterpret_cast<LPTHREAD_START_ROUTINE>(remote_init),
-			nullptr,
-			0,
-			nullptr
-		);
-		if (!thread && GetLastError() == ERROR_ACCESS_DENIED)
-		{
-			launcher_debug("CreateRemoteThread returned ACCESS_DENIED, trying NtCreateThreadEx");
-
-			const auto ntdll = GetModuleHandleA("ntdll.dll");
-			const auto nt_create_thread_ex = ntdll
-				? reinterpret_cast<nt_create_thread_ex_t>(GetProcAddress(ntdll, "NtCreateThreadEx"))
-				: nullptr;
-
-			if (!nt_create_thread_ex)
-			{
-				launcher_debug("NtCreateThreadEx is unavailable");
-			}
-			else
-			{
-				const auto status = nt_create_thread_ex(
-					&thread,
-					THREAD_ALL_ACCESS,
-					nullptr,
-					process,
-					reinterpret_cast<LPTHREAD_START_ROUTINE>(remote_init),
-					nullptr,
-					0,
-					0,
-					0,
-					0,
-					nullptr
-				);
-
-				if (status < 0 || !thread)
-				{
-					launcher_debug("NtCreateThreadEx failed with status " + std::to_string(status));
-				}
-				else
-				{
-					launcher_debug("NtCreateThreadEx succeeded");
-				}
-			}
-		}
-
-		if (!thread)
-		{
-			launcher_debug("CreateRemoteThread for runtime init failed (" + std::to_string(GetLastError()) + ")");
-			return false;
-		}
-
-		const auto close_thread = gsl::finally([&]()
-		{
-			CloseHandle(thread);
-		});
-
-		if (WaitForSingleObject(thread, 15000) != WAIT_OBJECT_0)
-		{
-			launcher_debug("wait for runtime init thread failed/timed out (" + std::to_string(GetLastError()) + ")");
-			return false;
-		}
-
-		DWORD exit_code = 0;
-		if (!GetExitCodeThread(thread, &exit_code))
-		{
-			launcher_debug("GetExitCodeThread for runtime init failed (" + std::to_string(GetLastError()) + ")");
-			return false;
-		}
-
-		launcher_print("remote init thread exited with code " + std::to_string(exit_code));
-		return exit_code == TRUE;
-	}
-
 	HANDLE create_kill_on_close_job()
 	{
 		const auto job = CreateJobObjectA(nullptr, nullptr);
@@ -552,14 +434,7 @@ int main()
 	}
 
 	launcher_print("runtime DLL loaded at 0x" + std::to_string(remote_module));
-	Sleep(1000);
-	launcher_print("initializing runtime...");
-	if (!call_remote_init(process_info.hProcess, runtime_path, remote_module))
-	{
-		return fail_and_wait("failed to initialize runtime");
-	}
-
-	launcher_print("runtime initialized successfully");
+	launcher_print("runtime async init dispatched from DLL attach");
 	if (options.pause_on_success)
 	{
 		wait_before_exit();

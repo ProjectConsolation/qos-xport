@@ -3,6 +3,14 @@
 
 #include "runtime.hpp"
 
+namespace
+{
+	DWORD WINAPI async_runtime_init(LPVOID)
+	{
+		return runtime::initialize(true) ? TRUE : FALSE;
+	}
+}
+
 extern "C" __declspec(dllexport) BOOL qos_xport_init()
 {
 	return runtime::initialize(true) ? TRUE : FALSE;
@@ -28,6 +36,13 @@ int WINAPI DllMain(HINSTANCE instance, const DWORD reason, LPVOID)
 	if (reason == DLL_PROCESS_ATTACH)
 	{
 		DisableThreadLibraryCalls(instance);
+
+#if defined(QOS_XPORT_AUTO_INIT)
+		if (const auto thread = CreateThread(nullptr, 0, async_runtime_init, nullptr, 0, nullptr))
+		{
+			CloseHandle(thread);
+		}
+#endif
 	}
 	else if (reason == DLL_PROCESS_DETACH)
 	{

@@ -143,6 +143,7 @@ workspace "qos-exp"
 		language "C++"
 		targetname "xport"
 		linkoptions { "/DEF:../src/xport.def" }
+		defines { "QOS_XPORT_AUTO_INIT" }
 
 		files
 		{
