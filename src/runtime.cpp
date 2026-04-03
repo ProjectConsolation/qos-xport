@@ -15,6 +15,7 @@ namespace
 	std::mutex runtime_mutex;
 	bool runtime_initialized = false;
 	bool runtime_log_cleared = false;
+	bool standalone_xport_mode = false;
 
 	std::filesystem::path get_launcher_log_path()
 	{
@@ -109,6 +110,18 @@ namespace
 
 namespace runtime
 {
+	void set_standalone_xport_mode(const bool enabled)
+	{
+		std::lock_guard _(runtime_mutex);
+		standalone_xport_mode = enabled;
+	}
+
+	bool is_standalone_xport_mode()
+	{
+		std::lock_guard _(runtime_mutex);
+		return standalone_xport_mode;
+	}
+
 	bool initialize(const bool report_errors)
 	{
 		std::lock_guard _(runtime_mutex);

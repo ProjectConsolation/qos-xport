@@ -3,6 +3,7 @@
 
 #include "console.hpp"
 #include "scheduler.hpp"
+#include "runtime.hpp"
 
 #include "game/game.hpp"
 
@@ -50,6 +51,11 @@ namespace patches
 	class component final : public component_interface
 	{
 	public:
+		bool is_supported() override
+		{
+			return !runtime::is_standalone_xport_mode();
+		}
+
 		void post_load() override
 		{
 			// un-cap fps

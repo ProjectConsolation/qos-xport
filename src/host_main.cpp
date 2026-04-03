@@ -14,6 +14,8 @@ namespace
 	utils::hook::detour g_xlive_patch_a;
 	utils::hook::detour g_xlive_patch_b;
 	utils::hook::detour g_splash_patch;
+	utils::hook::detour g_xnaddr_patch;
+	utils::hook::detour g_net_init_patch;
 
 	__declspec(naked) void xlive_ret_one_stub()
 	{
@@ -31,6 +33,15 @@ namespace
 			mov eax, 1
 			ret
 		}
+	}
+
+	void* __cdecl xnaddr_success_stub()
+	{
+		return game::game_offset(0x115FA0D4);
+	}
+
+	void __cdecl net_init_skip_stub()
+	{
 	}
 
 	std::filesystem::path get_host_log_path()
@@ -180,10 +191,11 @@ namespace
 		game::mp_dll = module;
 
 		host_print("loaded jb_mp_s.dll");
+		runtime::set_standalone_xport_mode(true);
 
 		try
 		{
-			host_print("applying early xlive/profile bypass patches");
+			host_print("applying early xlive/profile/render bypass patches");
 			host_print("patch detour 0x10240B30");
 			g_xlive_patch_a.create(game::game_offset(0x10240B30), xlive_ret_one_stub);
 			host_print("patch detour 0x10240B30 done");
@@ -199,6 +211,12 @@ namespace
 			host_print("patch detour 0x102C3280");
 			g_splash_patch.create(game::game_offset(0x102C3280), ret_success_stub);
 			host_print("patch detour 0x102C3280 done");
+			host_print("patch detour 0x10243EE0");
+			g_xnaddr_patch.create(game::game_offset(0x10243EE0), xnaddr_success_stub);
+			host_print("patch detour 0x10243EE0 done");
+			host_print("patch detour 0x10244890");
+			g_net_init_patch.create(game::game_offset(0x10244890), net_init_skip_stub);
+			host_print("patch detour 0x10244890 done");
 			host_print("early patches applied");
 		}
 		catch (const std::exception& error)
