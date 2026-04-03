@@ -4,6 +4,20 @@
 
 namespace
 {
+	using nt_create_thread_ex_t = LONG(NTAPI*)(
+		PHANDLE thread_handle,
+		ACCESS_MASK desired_access,
+		LPVOID object_attributes,
+		HANDLE process_handle,
+		LPTHREAD_START_ROUTINE start_routine,
+		LPVOID argument,
+		ULONG create_flags,
+		SIZE_T zero_bits,
+		SIZE_T stack_size,
+		SIZE_T maximum_stack_size,
+		LPVOID attribute_list
+	);
+
 	bool g_no_overwrite = false;
 
 	std::filesystem::path get_launcher_log_path()
@@ -332,7 +346,7 @@ namespace
 		}
 		launcher_debug("resolved qos_xport_remote_init at 0x" + std::to_string(remote_init));
 
-		const auto thread = CreateRemoteThread(
+		HANDLE thread = CreateRemoteThread(
 			process,
 			nullptr,
 			0,
@@ -341,6 +355,46 @@ namespace
 			0,
 			nullptr
 		);
+		if (!thread && GetLastError() == ERROR_ACCESS_DENIED)
+		{
+			launcher_debug("CreateRemoteThread returned ACCESS_DENIED, trying NtCreateThreadEx");
+
+			const auto ntdll = GetModuleHandleA("ntdll.dll");
+			const auto nt_create_thread_ex = ntdll
+				? reinterpret_cast<nt_create_thread_ex_t>(GetProcAddress(ntdll, "NtCreateThreadEx"))
+				: nullptr;
+
+			if (!nt_create_thread_ex)
+			{
+				launcher_debug("NtCreateThreadEx is unavailable");
+			}
+			else
+			{
+				const auto status = nt_create_thread_ex(
+					&thread,
+					THREAD_ALL_ACCESS,
+					nullptr,
+					process,
+					reinterpret_cast<LPTHREAD_START_ROUTINE>(remote_init),
+					nullptr,
+					0,
+					0,
+					0,
+					0,
+					nullptr
+				);
+
+				if (status < 0 || !thread)
+				{
+					launcher_debug("NtCreateThreadEx failed with status " + std::to_string(status));
+				}
+				else
+				{
+					launcher_debug("NtCreateThreadEx succeeded");
+				}
+			}
+		}
+
 		if (!thread)
 		{
 			launcher_debug("CreateRemoteThread for runtime init failed (" + std::to_string(GetLastError()) + ")");
