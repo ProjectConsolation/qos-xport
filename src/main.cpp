@@ -8,6 +8,11 @@ extern "C" __declspec(dllexport) BOOL qos_xport_init()
 	return runtime::initialize(true) ? TRUE : FALSE;
 }
 
+extern "C" __declspec(dllexport) DWORD WINAPI qos_xport_remote_init(LPVOID)
+{
+	return qos_xport_init();
+}
+
 extern "C" __declspec(dllexport) void qos_xport_shutdown()
 {
 	runtime::shutdown();

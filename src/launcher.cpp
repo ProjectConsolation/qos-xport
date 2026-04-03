@@ -256,7 +256,7 @@ namespace
 
 	bool call_remote_init(const HANDLE process, const std::string& dll_path, const uintptr_t remote_base)
 	{
-		const auto remote_init = get_remote_export_address(dll_path, remote_base, "qos_xport_init");
+		const auto remote_init = get_remote_export_address(dll_path, remote_base, "qos_xport_remote_init");
 		if (!remote_init)
 		{
 			return false;
