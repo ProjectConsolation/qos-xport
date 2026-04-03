@@ -326,6 +326,11 @@ namespace
 			host_print("patch detour 0x103BE750");
 			g_renderer_choice_patch.create(game::game_offset(0x103BE750), renderer_choice_skip_stub);
 			host_print("patch detour 0x103BE750 done");
+			host_print("patch gfxConfig callsite 0x103F9A80");
+			utils::hook::set<std::uint8_t>(game::game_offset(0x103F9A80), 0xB0);
+			utils::hook::set<std::uint8_t>(game::game_offset(0x103F9A81), 0x01);
+			utils::hook::nop(game::game_offset(0x103F9A82), 15);
+			host_print("patch gfxConfig callsite 0x103F9A80 done");
 			host_print("patch detour 0x103F6400");
 			g_engine_printf_hook.create(game::game_offset(0x103F6400), engine_printf_stub);
 			host_print("patch detour 0x103F6400 done");
