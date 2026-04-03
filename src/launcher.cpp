@@ -4,11 +4,60 @@
 
 namespace
 {
+	std::filesystem::path get_launcher_log_path()
+	{
+		char path[MAX_PATH]{};
+		GetModuleFileNameA(nullptr, path, MAX_PATH);
+		auto base = std::filesystem::path(path).parent_path() / "qos-xport";
+		std::error_code ec;
+		std::filesystem::create_directories(base, ec);
+		return base / "launcher.log";
+	}
+
+	void append_launcher_log(const std::string& message)
+	{
+		const auto line = message + "\r\n";
+		OutputDebugStringA(line.c_str());
+
+		const auto path = get_launcher_log_path();
+		const auto handle = CreateFileA(
+			path.string().c_str(),
+			FILE_APPEND_DATA,
+			FILE_SHARE_READ | FILE_SHARE_WRITE,
+			nullptr,
+			OPEN_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL,
+			nullptr
+		);
+
+		if (handle == INVALID_HANDLE_VALUE)
+		{
+			return;
+		}
+
+		const auto close_handle = gsl::finally([&]()
+		{
+			CloseHandle(handle);
+		});
+
+		DWORD bytes_written = 0;
+		WriteFile(handle, line.data(), static_cast<DWORD>(line.size()), &bytes_written, nullptr);
+	}
+
+	void launcher_print(const std::string& message)
+	{
+		std::printf("%s\n", message.c_str());
+		std::fflush(stdout);
+		append_launcher_log(message);
+	}
+
 	int fail_and_wait(const char* message)
 	{
 		std::fprintf(stderr, "%s", message);
 		std::fprintf(stderr, "\nPress Enter to close...\n");
 		std::fflush(stderr);
+		append_launcher_log(message);
+		append_launcher_log("Press Enter to close...");
 		std::getchar();
 		return 1;
 	}
@@ -20,8 +69,7 @@ namespace
 
 	void wait_before_exit(const char* message = "Press Enter to close...")
 	{
-		std::printf("%s\n", message);
-		std::fflush(stdout);
+		launcher_print(message);
 		std::getchar();
 	}
 
@@ -292,7 +340,7 @@ namespace
 			return false;
 		}
 
-		std::printf("QoS-xport: remote init thread exited with code %lu\n", exit_code);
+		launcher_print("QoS-xport: remote init thread exited with code " + std::to_string(exit_code));
 		return exit_code == TRUE;
 	}
 
@@ -331,6 +379,7 @@ namespace
 
 int main()
 {
+	append_launcher_log("========== QoS-xport launcher start ==========");
 	const auto options = parse_command_line();
 	const auto base_directory = get_self_directory();
 	const auto host_path = std::filesystem::path(options.host_path).is_absolute()
@@ -399,43 +448,43 @@ int main()
 		CloseHandle(process_info.hProcess);
 	});
 
-	std::printf("QoS-xport: launched host PID %lu\n", process_info.dwProcessId);
-	std::printf("QoS-xport: waiting for %s...\n", options.wait_module.c_str());
+	launcher_print("QoS-xport: launched host PID " + std::to_string(process_info.dwProcessId));
+	launcher_print("QoS-xport: waiting for " + options.wait_module + "...");
 
 	if (!wait_for_remote_module(process_info.dwProcessId, options.wait_module, 60s))
 	{
 		return fail_and_wait("QoS-xport: timed out waiting for " + options.wait_module);
 	}
 
-	std::printf("QoS-xport: injecting %s\n", runtime_path.c_str());
+	launcher_print("QoS-xport: injecting " + runtime_path);
 	const auto remote_module = inject_dll(process_info.hProcess, runtime_path);
 	if (!remote_module)
 	{
 		return fail_and_wait("QoS-xport: failed to inject runtime DLL");
 	}
 
-	std::printf("QoS-xport: runtime DLL loaded at 0x%p\n", reinterpret_cast<void*>(remote_module));
+	launcher_print("QoS-xport: runtime DLL loaded at 0x" + std::to_string(remote_module));
 	Sleep(1000);
-	std::printf("QoS-xport: initializing runtime...\n");
+	launcher_print("QoS-xport: initializing runtime...");
 	if (!call_remote_init(process_info.hProcess, runtime_path, remote_module))
 	{
 		return fail_and_wait("QoS-xport: failed to initialize runtime");
 	}
 
-	std::printf("QoS-xport: runtime initialized successfully\n");
+	launcher_print("QoS-xport: runtime initialized successfully");
 	if (options.pause_on_success)
 	{
 		wait_before_exit();
 		return 0;
 	}
 
-	std::printf("QoS-xport: waiting for host process to exit...\n");
+	launcher_print("QoS-xport: waiting for host process to exit...");
 	WaitForSingleObject(process_info.hProcess, INFINITE);
 
 	DWORD exit_code = 0;
 	if (GetExitCodeProcess(process_info.hProcess, &exit_code))
 	{
-		std::printf("QoS-xport: host process exited with code %lu\n", exit_code);
+		launcher_print("QoS-xport: host process exited with code " + std::to_string(exit_code));
 	}
 
 	wait_before_exit("QoS-xport: host exited. Press Enter to close...");
