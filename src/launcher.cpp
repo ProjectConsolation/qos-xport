@@ -168,12 +168,12 @@ namespace
 		return false;
 	}
 
-	bool inject_dll(const HANDLE process, const std::string& dll_path)
+	uintptr_t inject_dll(const HANDLE process, const std::string& dll_path)
 	{
 		auto* remote_path = VirtualAllocEx(process, nullptr, dll_path.size() + 1, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 		if (!remote_path)
 		{
-			return false;
+			return 0;
 		}
 
 		const auto free_remote_path = gsl::finally([&]()
@@ -183,19 +183,19 @@ namespace
 
 		if (!WriteProcessMemory(process, remote_path, dll_path.data(), dll_path.size() + 1, nullptr))
 		{
-			return false;
+			return 0;
 		}
 
 		auto* kernel32 = GetModuleHandleA("kernel32.dll");
 		if (!kernel32)
 		{
-			return false;
+			return 0;
 		}
 
 		auto* load_library = GetProcAddress(kernel32, "LoadLibraryA");
 		if (!load_library)
 		{
-			return false;
+			return 0;
 		}
 
 		const auto thread = CreateRemoteThread(
@@ -204,6 +204,70 @@ namespace
 			0,
 			reinterpret_cast<LPTHREAD_START_ROUTINE>(load_library),
 			remote_path,
+			0,
+			nullptr
+		);
+		if (!thread)
+		{
+			return 0;
+		}
+
+		const auto close_thread = gsl::finally([&]()
+		{
+			CloseHandle(thread);
+		});
+
+		if (WaitForSingleObject(thread, 15000) != WAIT_OBJECT_0)
+		{
+			return 0;
+		}
+
+		DWORD exit_code = 0;
+		if (!GetExitCodeThread(thread, &exit_code))
+		{
+			return 0;
+		}
+
+		return static_cast<uintptr_t>(exit_code);
+	}
+
+	uintptr_t get_remote_export_address(const std::string& dll_path, const uintptr_t remote_base, const char* export_name)
+	{
+		const auto local_module = LoadLibraryExA(dll_path.c_str(), nullptr, DONT_RESOLVE_DLL_REFERENCES);
+		if (!local_module)
+		{
+			return 0;
+		}
+
+		const auto free_module = gsl::finally([&]()
+		{
+			FreeLibrary(local_module);
+		});
+
+		const auto local_export = reinterpret_cast<uintptr_t>(GetProcAddress(local_module, export_name));
+		if (!local_export)
+		{
+			return 0;
+		}
+
+		const auto local_base = reinterpret_cast<uintptr_t>(local_module);
+		return remote_base + (local_export - local_base);
+	}
+
+	bool call_remote_init(const HANDLE process, const std::string& dll_path, const uintptr_t remote_base)
+	{
+		const auto remote_init = get_remote_export_address(dll_path, remote_base, "qos_xport_init");
+		if (!remote_init)
+		{
+			return false;
+		}
+
+		const auto thread = CreateRemoteThread(
+			process,
+			nullptr,
+			0,
+			reinterpret_cast<LPTHREAD_START_ROUTINE>(remote_init),
+			nullptr,
 			0,
 			nullptr
 		);
@@ -228,7 +292,7 @@ namespace
 			return false;
 		}
 
-		return exit_code != 0;
+		return exit_code == TRUE;
 	}
 
 	HANDLE create_kill_on_close_job()
@@ -343,12 +407,21 @@ int main()
 	}
 
 	std::printf("QoS-xport: injecting %s\n", runtime_path.c_str());
-	if (!inject_dll(process_info.hProcess, runtime_path))
+	const auto remote_module = inject_dll(process_info.hProcess, runtime_path);
+	if (!remote_module)
 	{
 		return fail_and_wait("QoS-xport: failed to inject runtime DLL");
 	}
 
-	std::printf("QoS-xport: runtime injected successfully\n");
+	std::printf("QoS-xport: runtime DLL loaded at 0x%p\n", reinterpret_cast<void*>(remote_module));
+	Sleep(1000);
+	std::printf("QoS-xport: initializing runtime...\n");
+	if (!call_remote_init(process_info.hProcess, runtime_path, remote_module))
+	{
+		return fail_and_wait("QoS-xport: failed to initialize runtime");
+	}
+
+	std::printf("QoS-xport: runtime initialized successfully\n");
 	if (options.pause_on_success)
 	{
 		wait_before_exit();

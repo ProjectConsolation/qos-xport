@@ -142,7 +142,6 @@ workspace "qos-exp"
 		kind "SharedLib"
 		language "C++"
 		targetname "xport"
-		defines { "QOS_XPORT_AUTO_INIT" }
 
 		files
 		{
