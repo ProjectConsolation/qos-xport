@@ -176,6 +176,7 @@ workspace "qos-exp"
 		kind "ConsoleApp"
 		language "C++"
 		targetname "QoS-xport"
+		linkoptions { '/MANIFESTUAC:"level=''requireAdministrator'' uiAccess=''false''"' }
 
 		files
 		{
