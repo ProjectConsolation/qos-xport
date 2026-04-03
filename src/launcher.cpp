@@ -292,6 +292,7 @@ namespace
 			return false;
 		}
 
+		std::printf("QoS-xport: remote init thread exited with code %lu\n", exit_code);
 		return exit_code == TRUE;
 	}
 

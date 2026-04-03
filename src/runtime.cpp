@@ -15,6 +15,36 @@ namespace
 	std::mutex runtime_mutex;
 	bool runtime_initialized = false;
 
+	void log_runtime_message(const std::string& message)
+	{
+		const auto line = message + "\r\n";
+		OutputDebugStringA(line.c_str());
+
+		const auto path = std::filesystem::current_path() / "qos-xport-runtime.log";
+		const auto handle = CreateFileA(
+			path.string().c_str(),
+			FILE_APPEND_DATA,
+			FILE_SHARE_READ | FILE_SHARE_WRITE,
+			nullptr,
+			OPEN_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL,
+			nullptr
+		);
+
+		if (handle == INVALID_HANDLE_VALUE)
+		{
+			return;
+		}
+
+		const auto close_handle = gsl::finally([&]()
+		{
+			CloseHandle(handle);
+		});
+
+		DWORD bytes_written = 0;
+		WriteFile(handle, line.data(), static_cast<DWORD>(line.size()), &bytes_written, nullptr);
+	}
+
 	DECLSPEC_NORETURN void WINAPI exit_hook(const int code)
 	{
 		component_loader::pre_destroy();
@@ -68,15 +98,19 @@ namespace runtime
 	bool initialize(const bool report_errors)
 	{
 		std::lock_guard _(runtime_mutex);
+		log_runtime_message("runtime::initialize entered");
 
 		if (runtime_initialized)
 		{
+			log_runtime_message("runtime already initialized");
 			return true;
 		}
 
 		enable_dpi_awareness();
+		log_runtime_message("dpi awareness enabled");
 
 		srand(uint32_t(time(nullptr)));
+		log_runtime_message("random seed initialized");
 
 		try
 		{
@@ -89,19 +123,27 @@ namespace runtime
 			*/
 			// utils::hook::set(0x5931B8, exit_hook);
 
+			log_runtime_message("calling component_loader::post_start");
 			if (!component_loader::post_start())
 			{
+				log_runtime_message("component_loader::post_start returned false");
 				throw std::string("component post start failed");
 			}
+			log_runtime_message("component_loader::post_start succeeded");
 
+			log_runtime_message("calling component_loader::post_load");
 			if (!component_loader::post_load())
 			{
+				log_runtime_message("component_loader::post_load returned false");
 				throw std::string("component post load failed");
 			}
+			log_runtime_message("component_loader::post_load succeeded");
 		}
 		catch (const std::string& error)
 		{
+			log_runtime_message("runtime initialization caught error: " + error);
 			component_loader::pre_destroy();
+			log_runtime_message("component_loader::pre_destroy completed after init failure");
 
 			if (report_errors)
 			{
@@ -112,6 +154,7 @@ namespace runtime
 		}
 
 		runtime_initialized = true;
+		log_runtime_message("runtime initialized successfully");
 		return true;
 	}
 
@@ -121,11 +164,14 @@ namespace runtime
 
 		if (!runtime_initialized)
 		{
+			log_runtime_message("runtime::shutdown skipped; not initialized");
 			return;
 		}
 
+		log_runtime_message("runtime::shutdown pre_destroy begin");
 		component_loader::pre_destroy();
 		runtime_initialized = false;
+		log_runtime_message("runtime::shutdown complete");
 	}
 
 	bool is_initialized()
