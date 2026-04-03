@@ -21,6 +21,7 @@ namespace
 	utils::hook::detour g_d3d_queries_patch;
 	utils::hook::detour g_renderer_choice_patch;
 	utils::hook::detour g_engine_printf_hook;
+	std::mutex g_output_mutex;
 	std::atomic_bool g_window_watch_kill = false;
 	std::atomic_bool g_window_hidden_logged = false;
 	std::thread g_window_watch_thread;
@@ -125,6 +126,7 @@ namespace
 
 	void host_print(const std::string& message)
 	{
+		std::lock_guard _(g_output_mutex);
 		std::printf("[QoS-xport]: %s\n", message.c_str());
 		std::fflush(stdout);
 		append_log_line("[host] " + message);
@@ -143,6 +145,7 @@ namespace
 			return;
 		}
 
+		std::lock_guard _(g_output_mutex);
 		std::printf("[engine] %s\n", trimmed.c_str());
 		std::fflush(stdout);
 
