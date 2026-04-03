@@ -18,6 +18,13 @@ namespace
 		return fail_and_wait(message.c_str());
 	}
 
+	void wait_before_exit(const char* message = "Press Enter to close...")
+	{
+		std::printf("%s\n", message);
+		std::fflush(stdout);
+		std::getchar();
+	}
+
 	std::string narrow_string(const std::wstring& value)
 	{
 		if (value.empty())
@@ -36,6 +43,7 @@ namespace
 		std::string host_path = "JB_LiveEngine_s.exe";
 		std::vector<std::string> host_args{ "-multiplayer" };
 		std::string wait_module = "jb_mp_s.dll";
+		bool pause_on_success = false;
 	};
 
 	std::string quote_argument(const std::string& value)
@@ -96,6 +104,12 @@ namespace
 			if (argument == "--wait-module" && (i + 1) < argc)
 			{
 				options.wait_module = narrow_string(argv[++i]);
+				continue;
+			}
+
+			if (argument == "--pause")
+			{
+				options.pause_on_success = true;
 				continue;
 			}
 
@@ -295,5 +309,9 @@ int main()
 	}
 
 	std::printf("QoS-xport: runtime injected successfully\n");
+	if (options.pause_on_success)
+	{
+		wait_before_exit();
+	}
 	return 0;
 }
