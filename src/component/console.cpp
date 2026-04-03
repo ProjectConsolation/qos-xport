@@ -416,6 +416,11 @@ namespace console
 	class component final : public component_interface
 	{
 	public:
+		bool is_supported() override
+		{
+			return false;
+		}
+
 		component()
 		{
 			if (!AttachConsole(ATTACH_PARENT_PROCESS))

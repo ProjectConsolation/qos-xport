@@ -26,6 +26,11 @@ namespace physpreset
 	class component final : public component_interface
 	{
 	public:
+		bool is_supported() override
+		{
+			return false;
+		}
+
 		game::qos::XAssetType get_type() override
 		{
 			return game::qos::ASSET_TYPE_PHYSPRESET;
