@@ -492,11 +492,36 @@ namespace
 		});
 
 		host_print("started standalone engine thread");
-		Sleep(5000);
+
+		constexpr DWORD runtime_init_delay_ms = 500;
+		constexpr DWORD runtime_init_poll_ms = 50;
+		DWORD waited_ms = 0;
+		while (waited_ms < runtime_init_delay_ms)
+		{
+			const auto wait_result = WaitForSingleObject(thread, runtime_init_poll_ms);
+			if (wait_result == WAIT_OBJECT_0)
+			{
+				DWORD exit_code = 0;
+				GetExitCodeThread(thread, &exit_code);
+				g_window_watch_kill = true;
+				if (g_window_watch_thread.joinable())
+				{
+					g_window_watch_thread.join();
+				}
+				return fail_and_wait("engine thread exited before runtime initialization (" + std::to_string(exit_code) + ")");
+			}
+
+			waited_ms += runtime_init_poll_ms;
+		}
 
 		host_print("initializing runtime in-process");
 		if (!runtime::initialize(true))
 		{
+			g_window_watch_kill = true;
+			if (g_window_watch_thread.joinable())
+			{
+				g_window_watch_thread.join();
+			}
 			return fail_and_wait("runtime initialization failed");
 		}
 

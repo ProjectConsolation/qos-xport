@@ -2,7 +2,7 @@
 
 a work-in-progress project for porting assets out of [007: Quantum of Solace](https://en.wikipedia.org/wiki/007:_Quantum_of_Solace), a game that runs on the Call of Duty engine between <i>Call of Duty: 4</i> & <i>Call of Duty: World at War.</i>
 
-thanks to [Rackover](https://github.com/Rackover) for IW3/IW4 research & [iw3x-port](https://github.com/iw4x/iw3x-port), which this project is basically inspired by.
+thanks to [Rackover](https://github.com/Rackover) for IW3/IW4 research, [iw3x-port](https://github.com/iw4x/iw3x-port) for the export-side architecture this project is heavily inspired by, and [ZoneTool](https://github.com/ZoneTool/zonetool) for the standalone tool/zonebuilder direction.
 
 ## fun facts
 
