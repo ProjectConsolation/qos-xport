@@ -20,6 +20,9 @@ namespace
 	utils::hook::detour g_d3d_device_patch;
 	utils::hook::detour g_d3d_queries_patch;
 	utils::hook::detour g_renderer_choice_patch;
+	utils::hook::detour g_renderer_init_patch;
+	utils::hook::detour g_renderer_backend_begin_patch;
+	utils::hook::detour g_renderer_backend_end_patch;
 	utils::hook::detour g_engine_printf_hook;
 	std::mutex g_output_mutex;
 	std::atomic_bool g_window_watch_kill = false;
@@ -70,6 +73,16 @@ namespace
 
 	void __fastcall renderer_choice_skip_stub(void*)
 	{
+	}
+
+	HWND __cdecl renderer_init_skip_stub()
+	{
+		return nullptr;
+	}
+
+	int __cdecl renderer_backend_skip_stub()
+	{
+		return 0;
 	}
 
 	std::filesystem::path get_host_log_path()
@@ -134,22 +147,30 @@ namespace
 
 	void engine_print(const std::string& message)
 	{
-		auto trimmed = message;
-		trimmed.erase(std::remove(trimmed.begin(), trimmed.end(), '\r'), trimmed.end());
-		while (!trimmed.empty() && trimmed.back() == '\n')
-		{
-			trimmed.pop_back();
-		}
-		if (trimmed.empty())
-		{
-			return;
-		}
-
 		std::lock_guard _(g_output_mutex);
-		std::printf("[engine] %s\n", trimmed.c_str());
-		std::fflush(stdout);
+		std::string normalized = message;
+		normalized.erase(std::remove(normalized.begin(), normalized.end(), '\r'), normalized.end());
 
-		append_log_line("[engine] " + trimmed);
+		size_t start = 0;
+		while (start <= normalized.size())
+		{
+			const auto end = normalized.find('\n', start);
+			auto line = normalized.substr(start, end == std::string::npos ? std::string::npos : end - start);
+			if (!line.empty())
+			{
+				std::printf("[engine] %s\n", line.c_str());
+				append_log_line("[engine] " + line);
+			}
+
+			if (end == std::string::npos)
+			{
+				break;
+			}
+
+			start = end + 1;
+		}
+
+		std::fflush(stdout);
 	}
 
 	void engine_printf_stub(int channel, const char* fmt, ...)
@@ -326,6 +347,15 @@ namespace
 			host_print("patch detour 0x103BE750");
 			g_renderer_choice_patch.create(game::game_offset(0x103BE750), renderer_choice_skip_stub);
 			host_print("patch detour 0x103BE750 done");
+			host_print("patch detour 0x103BEFD0");
+			g_renderer_init_patch.create(game::game_offset(0x103BEFD0), renderer_init_skip_stub);
+			host_print("patch detour 0x103BEFD0 done");
+			host_print("patch detour 0x103BFF00");
+			g_renderer_backend_begin_patch.create(game::game_offset(0x103BFF00), renderer_backend_skip_stub);
+			host_print("patch detour 0x103BFF00 done");
+			host_print("patch detour 0x103BF5C0");
+			g_renderer_backend_end_patch.create(game::game_offset(0x103BF5C0), renderer_backend_skip_stub);
+			host_print("patch detour 0x103BF5C0 done");
 			host_print("patch gfxConfig callsite 0x103F9A80");
 			utils::hook::set<std::uint8_t>(game::game_offset(0x103F9A80), 0xB0);
 			utils::hook::set<std::uint8_t>(game::game_offset(0x103F9A81), 0x01);
