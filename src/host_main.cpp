@@ -432,6 +432,12 @@ namespace
 			host_print("patch detour 0x103F5820");
 			g_exec_config_patch.create(game::game_offset(0x103F5820), exec_config_filter_stub);
 			host_print("patch detour 0x103F5820 done");
+			host_print("patch jump 0x103F7156 -> 0x103F7162");
+			utils::hook::jump(game::game_offset(0x103F7156), game::game_offset(0x103F7162));
+			host_print("patch jump 0x103F7156 done");
+			host_print("patch jump 0x103F71B8 -> 0x103F721D");
+			utils::hook::jump(game::game_offset(0x103F71B8), game::game_offset(0x103F721D));
+			host_print("patch jump 0x103F71B8 done");
 			host_print("patch jump 0x103F9BC1 -> 0x103F9BD7");
 			utils::hook::jump(game::game_offset(0x103F9BC1), game::game_offset(0x103F9BD7));
 			host_print("patch jump 0x103F9BC1 done");
