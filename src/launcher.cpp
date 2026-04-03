@@ -307,8 +307,10 @@ namespace
 		const auto remote_init = get_remote_export_address(dll_path, remote_base, "qos_xport_remote_init");
 		if (!remote_init)
 		{
+			append_launcher_log("QoS-xport: failed to resolve remote export qos_xport_remote_init");
 			return false;
 		}
+		append_launcher_log("QoS-xport: resolved qos_xport_remote_init at 0x" + std::to_string(remote_init));
 
 		const auto thread = CreateRemoteThread(
 			process,
@@ -321,6 +323,7 @@ namespace
 		);
 		if (!thread)
 		{
+			append_launcher_log("QoS-xport: CreateRemoteThread for runtime init failed (" + std::to_string(GetLastError()) + ")");
 			return false;
 		}
 
@@ -331,12 +334,14 @@ namespace
 
 		if (WaitForSingleObject(thread, 15000) != WAIT_OBJECT_0)
 		{
+			append_launcher_log("QoS-xport: wait for runtime init thread failed/timed out (" + std::to_string(GetLastError()) + ")");
 			return false;
 		}
 
 		DWORD exit_code = 0;
 		if (!GetExitCodeThread(thread, &exit_code))
 		{
+			append_launcher_log("QoS-xport: GetExitCodeThread for runtime init failed (" + std::to_string(GetLastError()) + ")");
 			return false;
 		}
 
@@ -380,12 +385,15 @@ namespace
 int main()
 {
 	append_launcher_log("========== QoS-xport launcher start ==========");
+	append_launcher_log("QoS-xport: launcher cwd is " + std::filesystem::current_path().string());
 	const auto options = parse_command_line();
 	const auto base_directory = get_self_directory();
 	const auto host_path = std::filesystem::path(options.host_path).is_absolute()
 		? options.host_path
 		: (std::filesystem::path(base_directory) / options.host_path).string();
 	const auto runtime_path = (std::filesystem::path(base_directory) / "xport.dll").string();
+	append_launcher_log("QoS-xport: host path is " + host_path);
+	append_launcher_log("QoS-xport: runtime path is " + runtime_path);
 
 	if (!std::filesystem::exists(host_path))
 	{
