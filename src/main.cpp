@@ -24,16 +24,17 @@ int WINAPI DllMain(HINSTANCE instance, const DWORD reason, LPVOID)
 	{
 		DisableThreadLibraryCalls(instance);
 
-#if defined(QOS_XPORT_PROXY_LOADER) || defined(QOS_XPORT_AUTO_INIT)
+#if defined(QOS_XPORT_AUTO_INIT)
 		runtime::initialize(true);
 #endif
 	}
 	else if (reason == DLL_PROCESS_DETACH)
 	{
-#if defined(QOS_XPORT_PROXY_LOADER) || defined(QOS_XPORT_AUTO_INIT)
+#if defined(QOS_XPORT_AUTO_INIT)
 		runtime::shutdown();
 #endif
 	}
 
 	return 1;
 }
+

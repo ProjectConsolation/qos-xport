@@ -138,34 +138,6 @@ workspace "qos-exp"
 		defines { "DEBUG", "_DEBUG" }
 	filter  {}
 
-project "d3d9" -- dll we are using to hook into the game
-		kind "SharedLib"
-		language "C++"
-		defines { "QOS_XPORT_PROXY_LOADER" }
-
-		files 
-		{
-			"./src/**.h",
-			"./src/**.hpp",
-			"./src/**.cpp",
-		}
-
-		includedirs 
-		{
-			"%{prj.location}/src",
-			"./src",
-		}
-
-		resincludedirs 
-		{
-			"$(ProjectDir)src" -- fix for VS IDE
-		}
-	
-		pchheader "std_include.hpp"
-		pchsource "src/std_include.cpp"
-
-	dependencies.imports()
-
 	project "xport"
 		kind "SharedLib"
 		language "C++"
@@ -177,11 +149,6 @@ project "d3d9" -- dll we are using to hook into the game
 			"./src/**.h",
 			"./src/**.hpp",
 			"./src/**.cpp",
-		}
-
-		removefiles
-		{
-			"./src/sdllp.cpp",
 		}
 
 		includedirs
@@ -215,7 +182,6 @@ project "d3d9" -- dll we are using to hook into the game
 		removefiles
 		{
 			"./src/main.cpp",
-			"./src/sdllp.cpp",
 		}
 
 		includedirs
@@ -236,3 +202,5 @@ project "d3d9" -- dll we are using to hook into the game
 
 	group "Dependencies"
 		dependencies.projects()
+
+
