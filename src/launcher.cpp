@@ -27,7 +27,7 @@ namespace
 			FILE_APPEND_DATA,
 			FILE_SHARE_READ | FILE_SHARE_WRITE,
 			nullptr,
-			g_no_overwrite ? OPEN_ALWAYS : CREATE_ALWAYS,
+			OPEN_ALWAYS,
 			FILE_ATTRIBUTE_NORMAL,
 			nullptr
 		);
@@ -314,10 +314,10 @@ namespace
 		const auto remote_init = get_remote_export_address(dll_path, remote_base, "qos_xport_remote_init");
 		if (!remote_init)
 		{
-			append_launcher_log("QoS-xport: failed to resolve remote export qos_xport_remote_init");
+			append_launcher_log("failed to resolve remote export qos_xport_remote_init");
 			return false;
 		}
-		append_launcher_log("QoS-xport: resolved qos_xport_remote_init at 0x" + std::to_string(remote_init));
+		append_launcher_log("resolved qos_xport_remote_init at 0x" + std::to_string(remote_init));
 
 		const auto thread = CreateRemoteThread(
 			process,
@@ -330,7 +330,7 @@ namespace
 		);
 		if (!thread)
 		{
-			append_launcher_log("QoS-xport: CreateRemoteThread for runtime init failed (" + std::to_string(GetLastError()) + ")");
+			append_launcher_log("CreateRemoteThread for runtime init failed (" + std::to_string(GetLastError()) + ")");
 			return false;
 		}
 
@@ -341,18 +341,18 @@ namespace
 
 		if (WaitForSingleObject(thread, 15000) != WAIT_OBJECT_0)
 		{
-			append_launcher_log("QoS-xport: wait for runtime init thread failed/timed out (" + std::to_string(GetLastError()) + ")");
+			append_launcher_log("wait for runtime init thread failed/timed out (" + std::to_string(GetLastError()) + ")");
 			return false;
 		}
 
 		DWORD exit_code = 0;
 		if (!GetExitCodeThread(thread, &exit_code))
 		{
-			append_launcher_log("QoS-xport: GetExitCodeThread for runtime init failed (" + std::to_string(GetLastError()) + ")");
+			append_launcher_log("GetExitCodeThread for runtime init failed (" + std::to_string(GetLastError()) + ")");
 			return false;
 		}
 
-		launcher_print("QoS-xport: remote init thread exited with code " + std::to_string(exit_code));
+		launcher_print("remote init thread exited with code " + std::to_string(exit_code));
 		return exit_code == TRUE;
 	}
 
@@ -398,15 +398,15 @@ int main()
 	}
 
 	append_launcher_log("========== launcher start ==========");
-	append_launcher_log("QoS-xport: launcher cwd is " + std::filesystem::current_path().string());
+	append_launcher_log("launcher cwd is " + std::filesystem::current_path().string());
 	const auto options = parse_command_line();
 	const auto base_directory = get_self_directory();
 	const auto host_path = std::filesystem::path(options.host_path).is_absolute()
 		? options.host_path
 		: (std::filesystem::path(base_directory) / options.host_path).string();
 	const auto runtime_path = (std::filesystem::path(base_directory) / "xport.dll").string();
-	append_launcher_log("QoS-xport: host path is " + host_path);
-	append_launcher_log("QoS-xport: runtime path is " + runtime_path);
+	append_launcher_log("host path is " + host_path);
+	append_launcher_log("runtime path is " + runtime_path);
 
 	if (!std::filesystem::exists(host_path))
 	{
@@ -469,46 +469,46 @@ int main()
 		CloseHandle(process_info.hProcess);
 	});
 
-	launcher_print("QoS-xport: launched host PID " + std::to_string(process_info.dwProcessId));
-	launcher_print("QoS-xport: waiting for " + options.wait_module + "...");
+	launcher_print("launched host PID " + std::to_string(process_info.dwProcessId));
+	launcher_print("waiting for " + options.wait_module + "...");
 
 	if (!wait_for_remote_module(process_info.dwProcessId, options.wait_module, 60s))
 	{
 		return fail_and_wait("QoS-xport: timed out waiting for " + options.wait_module);
 	}
 
-	launcher_print("QoS-xport: injecting " + runtime_path);
+	launcher_print("injecting " + runtime_path);
 	const auto remote_module = inject_dll(process_info.hProcess, runtime_path);
 	if (!remote_module)
 	{
-		return fail_and_wait("QoS-xport: failed to inject runtime DLL");
+		return fail_and_wait("failed to inject runtime DLL");
 	}
 
-	launcher_print("QoS-xport: runtime DLL loaded at 0x" + std::to_string(remote_module));
+	launcher_print("runtime DLL loaded at 0x" + std::to_string(remote_module));
 	Sleep(1000);
-	launcher_print("QoS-xport: initializing runtime...");
+	launcher_print("initializing runtime...");
 	if (!call_remote_init(process_info.hProcess, runtime_path, remote_module))
 	{
-		return fail_and_wait("QoS-xport: failed to initialize runtime");
+		return fail_and_wait("failed to initialize runtime");
 	}
 
-	launcher_print("QoS-xport: runtime initialized successfully");
+	launcher_print("runtime initialized successfully");
 	if (options.pause_on_success)
 	{
 		wait_before_exit();
 		return 0;
 	}
 
-	launcher_print("QoS-xport: waiting for host process to exit...");
+	launcher_print("waiting for host process to exit...");
 	WaitForSingleObject(process_info.hProcess, INFINITE);
 
 	DWORD exit_code = 0;
 	if (GetExitCodeProcess(process_info.hProcess, &exit_code))
 	{
-		launcher_print("QoS-xport: host process exited with code " + std::to_string(exit_code));
+		launcher_print("host process exited with code " + std::to_string(exit_code));
 	}
 
-	wait_before_exit("QoS-xport: host exited. Press Enter to close...");
+	wait_before_exit("host exited. Press Enter to close...");
 
 	return 0;
 }
