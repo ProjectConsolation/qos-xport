@@ -14,6 +14,7 @@ namespace
 {
 	std::mutex runtime_mutex;
 	bool runtime_initialized = false;
+	bool runtime_log_cleared = false;
 
 	std::filesystem::path get_runtime_log_path()
 	{
@@ -29,6 +30,12 @@ namespace
 		OutputDebugStringA(line.c_str());
 
 		const auto path = get_runtime_log_path();
+		if (!runtime_log_cleared)
+		{
+			DeleteFileA(path.string().c_str());
+			runtime_log_cleared = true;
+		}
+
 		const auto handle = CreateFileA(
 			path.string().c_str(),
 			FILE_APPEND_DATA,
