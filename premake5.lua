@@ -166,10 +166,10 @@ project "d3d9" -- dll we are using to hook into the game
 
 	dependencies.imports()
 
-	project "qos-xport"
+	project "xport-dll"
 		kind "SharedLib"
 		language "C++"
-		targetname "qos-xport"
+		targetname "xport-dll"
 		defines { "QOS_XPORT_AUTO_INIT" }
 
 		files

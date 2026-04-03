@@ -223,7 +223,7 @@ int main()
 	const auto host_path = std::filesystem::path(options.host_path).is_absolute()
 		? options.host_path
 		: (std::filesystem::path(base_directory) / options.host_path).string();
-	const auto runtime_path = (std::filesystem::path(base_directory) / "qos-xport.dll").string();
+	const auto runtime_path = (std::filesystem::path(base_directory) / "xport-dll.dll").string();
 
 	if (!std::filesystem::exists(host_path))
 	{
