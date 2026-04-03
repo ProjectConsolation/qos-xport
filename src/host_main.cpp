@@ -27,6 +27,7 @@ namespace
 	utils::hook::detour g_sound_init_patch;
 	utils::hook::detour g_session_start_patch;
 	utils::hook::detour g_client_disconnect_patch;
+	utils::hook::detour g_exec_config_patch;
 	utils::hook::detour g_engine_printf_hook;
 	std::mutex g_output_mutex;
 	std::atomic_bool g_window_watch_kill = false;
@@ -106,6 +107,22 @@ namespace
 
 	void __cdecl client_disconnect_skip_stub()
 	{
+	}
+
+	char __cdecl exec_config_filter_stub(char* name, int a2, int a3, int a4)
+	{
+		if (runtime::is_standalone_xport_mode() && name)
+		{
+			const auto lowered = utils::string::to_lower(name);
+			if (lowered.find("consolation_mp.cfg") != std::string::npos
+				|| lowered.find("config_mp.cfg") != std::string::npos)
+			{
+				host_print(std::string("skipping config exec in xport mode: ") + name);
+				return 1;
+			}
+		}
+
+		return g_exec_config_patch.invoke<char>(name, a2, a3, a4);
 	}
 
 	std::filesystem::path get_host_log_path()
@@ -391,6 +408,9 @@ namespace
 			host_print("patch detour 0x1031E840");
 			g_client_disconnect_patch.create(game::game_offset(0x1031E840), client_disconnect_skip_stub);
 			host_print("patch detour 0x1031E840 done");
+			host_print("patch detour 0x103F5820");
+			g_exec_config_patch.create(game::game_offset(0x103F5820), exec_config_filter_stub);
+			host_print("patch detour 0x103F5820 done");
 			host_print("patch jump 0x103F9BC1 -> 0x103F9BD7");
 			utils::hook::jump(game::game_offset(0x103F9BC1), game::game_offset(0x103F9BD7));
 			host_print("patch jump 0x103F9BC1 done");
