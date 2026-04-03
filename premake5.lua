@@ -151,6 +151,12 @@ workspace "qos-exp"
 			"./src/**.cpp",
 		}
 
+		removefiles
+		{
+			"./src/launcher.cpp",
+			"./src/sdllp.cpp",
+		}
+
 		includedirs
 		{
 			"%{prj.location}/src",
@@ -174,14 +180,9 @@ workspace "qos-exp"
 
 		files
 		{
-			"./src/**.h",
-			"./src/**.hpp",
-			"./src/**.cpp",
-		}
-
-		removefiles
-		{
-			"./src/main.cpp",
+			"./src/std_include.hpp",
+			"./src/std_include.cpp",
+			"./src/launcher.cpp",
 		}
 
 		includedirs
