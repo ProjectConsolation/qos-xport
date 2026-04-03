@@ -1,6 +1,7 @@
 #include <std_include.hpp>
 
 #include <TlHelp32.h>
+#include "launcher.hpp"
 
 namespace
 {
@@ -338,7 +339,7 @@ namespace
 	}
 }
 
-int main()
+int run_launcher_mode()
 {
 	const auto log_path = get_launcher_log_path();
 	if (!g_no_overwrite)
