@@ -20,7 +20,7 @@ namespace
 	struct launcher_options
 	{
 		std::string host_path = "JB_LiveEngine_s.exe";
-		std::vector<std::string> host_args{};
+		std::vector<std::string> host_args{ "-multiplayer" };
 		std::string wait_module = "jb_mp_s.dll";
 	};
 
@@ -223,7 +223,7 @@ int main()
 	const auto host_path = std::filesystem::path(options.host_path).is_absolute()
 		? options.host_path
 		: (std::filesystem::path(base_directory) / options.host_path).string();
-	const auto runtime_path = (std::filesystem::path(base_directory) / "xport-dll.dll").string();
+	const auto runtime_path = (std::filesystem::path(base_directory) / "xport.dll").string();
 
 	if (!std::filesystem::exists(host_path))
 	{
