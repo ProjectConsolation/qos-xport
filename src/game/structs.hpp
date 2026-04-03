@@ -95,6 +95,14 @@ namespace game::qos
 
 	struct cplane_s;
 	struct cbrushside_t;
+	struct cStaticModel_t;
+	struct dmaterial_t;
+	struct cNode_t;
+	struct cLeafBrushNode_s;
+	struct CollisionBorder;
+	struct CollisionPartition;
+	struct CollisionAabbTree;
+	struct cbrush_t;
 
 	struct MapEnts
 	{
@@ -110,19 +118,19 @@ namespace game::qos
 		int planeCount;
 		cplane_s* planes;
 		unsigned int numStaticModels;
-		void* staticModelList;
+		cStaticModel_t* staticModelList;
 		unsigned int numMaterials;
-		void* materials;
+		dmaterial_t* materials;
 		unsigned int numBrushSides;
 		cbrushside_t* brushsides;
 		unsigned int numBrushEdges;
 		char* brushEdges;
 		unsigned int numNodes;
-		void* nodes;
+		cNode_t* nodes;
 		unsigned int numLeafs;
 		cLeaf_t* leafs;
 		unsigned int leafbrushNodesCount;
-		void* leafbrushNodes;
+		cLeafBrushNode_s* leafbrushNodes;
 		unsigned int numLeafBrushes;
 		unsigned short* leafbrushes;
 		unsigned int numLeafSurfaces;
@@ -133,15 +141,17 @@ namespace game::qos
 		unsigned short* triIndices;
 		char* triEdgeIsWalkable;
 		int borderCount;
-		void* borders;
+		CollisionBorder* borders;
 		int partitionCount;
-		void* partitions;
-		char pad_0084[16];
+		CollisionPartition* partitions;
+		int aabbTreeCount;
+		CollisionAabbTree* aabbTrees;
+		char pad_0084[8];
 		unsigned int numSubModels; //0x0094
 		cmodel_t* cmodels; //0x0098
 		unsigned short numBrushes; //0x009C
 		unsigned short pad_009E;
-		void* brushes; //0x00A0
+		cbrush_t* brushes; //0x00A0
 		Bounds* brushBounds; //0x00A4
 		int* brushContents; //0x00A8
 		char pad_00AC[8];
