@@ -19,6 +19,7 @@ namespace
 	utils::hook::detour g_d3d_interface_patch;
 	utils::hook::detour g_d3d_device_patch;
 	utils::hook::detour g_d3d_queries_patch;
+	utils::hook::detour g_engine_printf_hook;
 	std::atomic_bool g_window_watch_kill = false;
 	std::atomic_bool g_window_hidden_logged = false;
 	std::thread g_window_watch_thread;
@@ -105,11 +106,52 @@ namespace
 		WriteFile(handle, line.data(), static_cast<DWORD>(line.size()), &bytes_written, nullptr);
 	}
 
+	std::string format_message(va_list* ap, const char* message)
+	{
+		thread_local char buffer[0x2000]{};
+		const auto count = vsnprintf_s(buffer, _TRUNCATE, message, *ap);
+		if (count < 0)
+		{
+			return {};
+		}
+
+		return {buffer, static_cast<size_t>(count)};
+	}
+
 	void host_print(const std::string& message)
 	{
 		std::printf("[QoS-xport]: %s\n", message.c_str());
 		std::fflush(stdout);
 		append_host_log(message);
+	}
+
+	void engine_print(const std::string& message)
+	{
+		const auto trimmed = utils::string::replace(message, "\r", "");
+		if (trimmed.empty())
+		{
+			return;
+		}
+
+		std::printf("[engine] %s", trimmed.c_str());
+		if (trimmed.back() != '\n')
+		{
+			std::printf("\n");
+		}
+		std::fflush(stdout);
+
+		append_host_log(std::string("[engine] ") + trimmed);
+	}
+
+	void engine_printf_stub(int channel, const char* fmt, ...)
+	{
+		va_list ap;
+		va_start(ap, fmt);
+		const auto message = format_message(&ap, fmt);
+		va_end(ap);
+
+		g_engine_printf_hook.invoke<void>(channel, "%s", message.c_str());
+		engine_print(message);
 	}
 
 	void __cdecl host_terminate_handler()
@@ -272,6 +314,9 @@ namespace
 			host_print("patch detour 0x103BDB50");
 			g_d3d_queries_patch.create(game::game_offset(0x103BDB50), d3d_queries_skip_stub);
 			host_print("patch detour 0x103BDB50 done");
+			host_print("patch detour 0x103F6400");
+			g_engine_printf_hook.create(game::game_offset(0x103F6400), engine_printf_stub);
+			host_print("patch detour 0x103F6400 done");
 			host_print("early patches applied");
 		}
 		catch (const std::exception& error)
