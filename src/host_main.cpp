@@ -127,7 +127,8 @@ namespace
 
 	void engine_print(const std::string& message)
 	{
-		const auto trimmed = utils::string::replace(message, "\r", "");
+		auto trimmed = message;
+		trimmed.erase(std::remove(trimmed.begin(), trimmed.end(), '\r'), trimmed.end());
 		if (trimmed.empty())
 		{
 			return;
@@ -140,7 +141,7 @@ namespace
 		}
 		std::fflush(stdout);
 
-		append_host_log(std::string("[engine] ") + trimmed);
+		append_host_log("[engine] " + trimmed);
 	}
 
 	void engine_printf_stub(int channel, const char* fmt, ...)
