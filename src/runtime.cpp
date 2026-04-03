@@ -15,12 +15,24 @@ namespace
 	std::mutex runtime_mutex;
 	bool runtime_initialized = false;
 
+	std::filesystem::path get_runtime_log_path()
+	{
+		char temp_path[MAX_PATH]{};
+		const auto length = GetTempPathA(MAX_PATH, temp_path);
+		if (length == 0 || length > MAX_PATH)
+		{
+			return std::filesystem::current_path() / "qos-xport-runtime.log";
+		}
+
+		return std::filesystem::path(temp_path) / "qos-xport-runtime.log";
+	}
+
 	void log_runtime_message(const std::string& message)
 	{
 		const auto line = message + "\r\n";
 		OutputDebugStringA(line.c_str());
 
-		const auto path = std::filesystem::current_path() / "qos-xport-runtime.log";
+		const auto path = get_runtime_log_path();
 		const auto handle = CreateFileA(
 			path.string().c_str(),
 			FILE_APPEND_DATA,
