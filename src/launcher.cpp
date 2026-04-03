@@ -312,6 +312,17 @@ int main()
 	if (options.pause_on_success)
 	{
 		wait_before_exit();
+		return 0;
 	}
+
+	std::printf("QoS-xport: waiting for host process to exit...\n");
+	WaitForSingleObject(process_info.hProcess, INFINITE);
+
+	DWORD exit_code = 0;
+	if (GetExitCodeProcess(process_info.hProcess, &exit_code))
+	{
+		std::printf("QoS-xport: host process exited with code %lu\n", exit_code);
+	}
+
 	return 0;
 }

@@ -418,14 +418,14 @@ namespace console
 	public:
 		component()
 		{
-			AllocConsole();
-			AttachConsole(GetCurrentProcessId());
+			if (!AttachConsole(ATTACH_PARENT_PROCESS))
+			{
+				AllocConsole();
+			}
 
 			freopen_s((FILE**)stdin, "CONIN$", "r", stdin);
 			freopen_s((FILE**)stderr, "CONOUT$", "w", stderr);
 			freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
-
-			ShowWindow(GetConsoleWindow(), SW_HIDE);
 		}
 
 		void post_load() override

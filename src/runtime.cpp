@@ -74,7 +74,6 @@ namespace runtime
 			return true;
 		}
 
-		ShowWindow(GetConsoleWindow(), SW_HIDE);
 		enable_dpi_awareness();
 
 		srand(uint32_t(time(nullptr)));
