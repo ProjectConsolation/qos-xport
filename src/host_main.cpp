@@ -5,6 +5,8 @@
 #include "game/game.hpp"
 
 #include <iostream>
+#include <eh.h>
+#include <cstdlib>
 #include <utils/hook.hpp>
 
 namespace
@@ -61,6 +63,41 @@ namespace
 		append_host_log(message);
 	}
 
+	void __cdecl host_terminate_handler()
+	{
+		append_host_log("CRT terminate handler invoked");
+		abort();
+	}
+
+	void __cdecl host_invalid_parameter_handler(
+		const wchar_t* expression,
+		const wchar_t* function,
+		const wchar_t* file,
+		unsigned int line,
+		uintptr_t)
+	{
+		std::string message = "CRT invalid parameter";
+		if (function)
+		{
+			char buffer[512]{};
+			WideCharToMultiByte(CP_UTF8, 0, function, -1, buffer, sizeof(buffer), nullptr, nullptr);
+			message += " in ";
+			message += buffer;
+		}
+
+		if (file)
+		{
+			char buffer[512]{};
+			WideCharToMultiByte(CP_UTF8, 0, file, -1, buffer, sizeof(buffer), nullptr, nullptr);
+			message += " at ";
+			message += buffer;
+			message += ":";
+			message += std::to_string(line);
+		}
+
+		append_host_log(message);
+	}
+
 	int fail_and_wait(const std::string& message)
 	{
 		host_print(message);
@@ -113,6 +150,8 @@ namespace
 	{
 		const auto log_path = get_host_log_path();
 		DeleteFileA(log_path.string().c_str());
+		set_terminate(host_terminate_handler);
+		_set_invalid_parameter_handler(host_invalid_parameter_handler);
 
 		host_print("========== standalone host start ==========");
 
@@ -126,9 +165,13 @@ namespace
 		host_print("loaded jb_mp_s.dll");
 
 		host_print("applying early xlive/profile bypass patches");
+		host_print("patch jump 0x10240B30");
 		utils::hook::jump(game::game_offset(0x10240B30), ret_one);
+		host_print("patch jump 0x10240A30");
 		utils::hook::jump(game::game_offset(0x10240A30), ret_one);
+		host_print("patch nop 0x102489A1");
 		utils::hook::nop(game::game_offset(0x102489A1), 5);
+		host_print("early patches applied");
 
 		const auto start_main_mp = GetProcAddress(module, "startMainMP");
 		if (!start_main_mp)
