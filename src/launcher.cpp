@@ -364,5 +364,7 @@ int main()
 		std::printf("QoS-xport: host process exited with code %lu\n", exit_code);
 	}
 
+	wait_before_exit("QoS-xport: host exited. Press Enter to close...");
+
 	return 0;
 }
