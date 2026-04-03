@@ -34,6 +34,9 @@ namespace
 	std::atomic_bool g_window_hidden_logged = false;
 	std::thread g_window_watch_thread;
 
+	void append_log_line(const std::string& line);
+	void host_print(const std::string& message);
+
 	__declspec(naked) void xlive_ret_one_stub()
 	{
 		__asm
@@ -113,7 +116,11 @@ namespace
 	{
 		if (runtime::is_standalone_xport_mode() && name)
 		{
-			const auto lowered = utils::string::to_lower(name);
+			auto lowered = std::string(name);
+			std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](unsigned char c)
+			{
+				return static_cast<char>(std::tolower(c));
+			});
 			if (lowered.find("consolation_mp.cfg") != std::string::npos
 				|| lowered.find("config_mp.cfg") != std::string::npos)
 			{
