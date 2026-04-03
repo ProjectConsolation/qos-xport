@@ -66,7 +66,7 @@ namespace
 	void __cdecl host_terminate_handler()
 	{
 		append_host_log("CRT terminate handler invoked");
-		abort();
+		ExitProcess(0xE0000001);
 	}
 
 	void __cdecl host_invalid_parameter_handler(
@@ -164,14 +164,28 @@ namespace
 
 		host_print("loaded jb_mp_s.dll");
 
-		host_print("applying early xlive/profile bypass patches");
-		host_print("patch jump 0x10240B30");
-		utils::hook::jump(game::game_offset(0x10240B30), ret_one);
-		host_print("patch jump 0x10240A30");
-		utils::hook::jump(game::game_offset(0x10240A30), ret_one);
-		host_print("patch nop 0x102489A1");
-		utils::hook::nop(game::game_offset(0x102489A1), 5);
-		host_print("early patches applied");
+		try
+		{
+			host_print("applying early xlive/profile bypass patches");
+			host_print("patch jump 0x10240B30");
+			utils::hook::jump(game::game_offset(0x10240B30), ret_one);
+			host_print("patch jump 0x10240B30 done");
+			host_print("patch jump 0x10240A30");
+			utils::hook::jump(game::game_offset(0x10240A30), ret_one);
+			host_print("patch jump 0x10240A30 done");
+			host_print("patch nop 0x102489A1");
+			utils::hook::nop(game::game_offset(0x102489A1), 5);
+			host_print("patch nop 0x102489A1 done");
+			host_print("early patches applied");
+		}
+		catch (const std::exception& error)
+		{
+			return fail_and_wait(std::string("early patch stage failed: ") + error.what());
+		}
+		catch (...)
+		{
+			return fail_and_wait("early patch stage failed with unknown exception");
+		}
 
 		const auto start_main_mp = GetProcAddress(module, "startMainMP");
 		if (!start_main_mp)
