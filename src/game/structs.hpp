@@ -95,14 +95,14 @@ namespace game::qos
 
 	struct cplane_s;
 	struct cbrushside_t;
-	struct cStaticModel_t;
-	struct dmaterial_t;
 	struct cNode_t;
 	struct cLeafBrushNode_s;
 	struct CollisionBorder;
 	struct CollisionPartition;
 	struct CollisionAabbTree;
-	struct cbrush_t;
+	struct BrushWrapper;
+	struct cStaticModel_t;
+	struct dmaterial_t;
 
 	struct MapEnts
 	{
@@ -151,7 +151,7 @@ namespace game::qos
 		cmodel_t* cmodels; //0x0098
 		unsigned short numBrushes; //0x009C
 		unsigned short pad_009E;
-		cbrush_t* brushes; //0x00A0
+		BrushWrapper* brushes; //0x00A0
 		Bounds* brushBounds; //0x00A4
 		int* brushContents; //0x00A8
 		char pad_00AC[8];
@@ -464,6 +464,70 @@ namespace game::qos
 		cplane_s* planes;
 	};
 
+	struct cNode_t
+	{
+		cplane_s* plane;
+		__int16 children[2];
+	};
+
+	struct cLeafBrushNodeLeaf_t
+	{
+		unsigned __int16* brushes;
+	};
+
+	struct cLeafBrushNodeChildren_t
+	{
+		float dist;
+		float range;
+		unsigned __int16 childOffset[2];
+	};
+
+	union cLeafBrushNodeData_t
+	{
+		cLeafBrushNodeLeaf_t leaf;
+		cLeafBrushNodeChildren_t children;
+	};
+
+	struct cLeafBrushNode_s
+	{
+		char axis;
+		__int16 leafBrushCount;
+		int contents;
+		cLeafBrushNodeData_t data;
+	};
+
+	struct CollisionBorder
+	{
+		float distEq[3];
+		float zBase;
+		float zSlope;
+		float start;
+		float length;
+	};
+
+	struct CollisionPartition
+	{
+		char triCount;
+		char borderCount;
+		int firstTri;
+		CollisionBorder* borders;
+	};
+
+	union CollisionAabbTreeIndex
+	{
+		int firstChildIndex;
+		int partitionIndex;
+	};
+
+	struct CollisionAabbTree
+	{
+		float origin[3];
+		unsigned __int16 materialIndex;
+		unsigned __int16 childCount;
+		float halfSize[3];
+		CollisionAabbTreeIndex u;
+	};
+
 	struct PhysMass
 	{
 		float centerOfMass[3];
@@ -538,6 +602,22 @@ namespace game::qos
 		PhysGeomList* physGeoms; // 232
 		void* physConstraints; // 236
 	}; static_assert(sizeof(XModel) == 240);
+
+	struct cStaticModel_t
+	{
+		XModel* xmodel;
+		float origin[3];
+		float invScaledAxis[3][3];
+		float absmin[3];
+		float absmax[3];
+	};
+
+	struct dmaterial_t
+	{
+		char material[64];
+		int surfaceFlags;
+		int contentFlags;
+	};
 
 	struct GfxDrawSurfFields
 	{
