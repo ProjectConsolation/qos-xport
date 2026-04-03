@@ -23,6 +23,7 @@ namespace
 	utils::hook::detour g_renderer_init_patch;
 	utils::hook::detour g_renderer_backend_begin_patch;
 	utils::hook::detour g_renderer_backend_end_patch;
+	utils::hook::detour g_material_smp_patch;
 	utils::hook::detour g_sound_init_patch;
 	utils::hook::detour g_engine_printf_hook;
 	std::mutex g_output_mutex;
@@ -82,6 +83,11 @@ namespace
 	}
 
 	int __cdecl renderer_backend_skip_stub()
+	{
+		return 0;
+	}
+
+	int __fastcall material_smp_skip_stub(char)
 	{
 		return 0;
 	}
@@ -362,9 +368,15 @@ namespace
 			host_print("patch detour 0x103BF5C0");
 			g_renderer_backend_end_patch.create(game::game_offset(0x103BF5C0), renderer_backend_skip_stub);
 			host_print("patch detour 0x103BF5C0 done");
+			host_print("patch detour 0x103BF110");
+			g_material_smp_patch.create(game::game_offset(0x103BF110), material_smp_skip_stub);
+			host_print("patch detour 0x103BF110 done");
 			host_print("patch detour 0x104035F0");
 			g_sound_init_patch.create(game::game_offset(0x104035F0), sound_init_skip_stub);
 			host_print("patch detour 0x104035F0 done");
+			host_print("patch jump 0x103F9BC1 -> 0x103F9BD7");
+			utils::hook::jump(game::game_offset(0x103F9BC1), game::game_offset(0x103F9BD7));
+			host_print("patch jump 0x103F9BC1 done");
 			host_print("patch jump 0x103F9B5A -> 0x103F9B85");
 			utils::hook::jump(game::game_offset(0x103F9B5A), game::game_offset(0x103F9B85));
 			host_print("patch jump 0x103F9B5A done");
