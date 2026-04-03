@@ -231,6 +231,26 @@ namespace
 		return exit_code != 0;
 	}
 
+	HANDLE create_kill_on_close_job()
+	{
+		const auto job = CreateJobObjectA(nullptr, nullptr);
+		if (!job)
+		{
+			return nullptr;
+		}
+
+		JOBOBJECT_EXTENDED_LIMIT_INFORMATION info{};
+		info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+
+		if (!SetInformationJobObject(job, JobObjectExtendedLimitInformation, &info, sizeof(info)))
+		{
+			CloseHandle(job);
+			return nullptr;
+		}
+
+		return job;
+	}
+
 	std::string build_host_command_line(const launcher_options& options)
 	{
 		std::string command_line = quote_argument(options.host_path);
@@ -288,8 +308,28 @@ int main()
 		return fail_and_wait("QoS-xport: failed to launch host (" + std::to_string(GetLastError()) + ")");
 	}
 
+	const auto job = create_kill_on_close_job();
+	if (!job)
+	{
+		TerminateProcess(process_info.hProcess, 1);
+		CloseHandle(process_info.hThread);
+		CloseHandle(process_info.hProcess);
+		return fail_and_wait("QoS-xport: failed to create process job");
+	}
+
+	if (!AssignProcessToJobObject(job, process_info.hProcess))
+	{
+		const auto error = GetLastError();
+		CloseHandle(job);
+		TerminateProcess(process_info.hProcess, 1);
+		CloseHandle(process_info.hThread);
+		CloseHandle(process_info.hProcess);
+		return fail_and_wait("QoS-xport: failed to assign host to job (" + std::to_string(error) + ")");
+	}
+
 	const auto close_process_handles = gsl::finally([&]()
 	{
+		CloseHandle(job);
 		CloseHandle(process_info.hThread);
 		CloseHandle(process_info.hProcess);
 	});
