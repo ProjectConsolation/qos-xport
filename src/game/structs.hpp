@@ -1698,6 +1698,13 @@ namespace game::qos
 		XAssetEntryPoolEntry* next;
 	};
 
+	struct XZoneInfo
+	{
+		const char* name;
+		int allocFlags;
+		int freeFlags;
+	};
+
 	struct CmdArgs
 	{
 		int nesting;

@@ -40,6 +40,7 @@ namespace game
 	void Cmd_AddCommandInternal(const char* name, void(__cdecl* function)(), qos::cmd_function_s* cmd);
 	bool DB_IsXAssetDefault(qos::XAssetType type, const char* name);
 	void DB_EnumXAssetEntries(qos::XAssetType type, std::function<void(qos::XAssetEntryPoolEntry*)> callback, bool overrides);
+	void DB_LoadXAssets(qos::XZoneInfo* zone_info, int zone_count, bool sync);
 	void DB_SyncXAssets();
 
 	namespace iw4

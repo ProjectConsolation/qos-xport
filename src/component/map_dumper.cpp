@@ -142,12 +142,25 @@ namespace map_dumper
 
 		void dump_map(std::string name)
 		{
+			// QoS server init loads the optional "<map>_load" fastfile through DB_LoadXAssets
+			// with alloc/free flags 4/12 before asset resolution continues.
+			constexpr int xzone_alloc_map_load = 4;
+			constexpr int xzone_free_map_load = 12;
+
 			bool is_singleplayer = !name.starts_with("mp_");
 			std::string bsp_name = utils::string::va("maps/%s%s.d3dbsp", is_singleplayer ? "" : "mp/", name.data());
+			std::string load_fastfile = utils::string::va("%s_load", name.data());
 
 			console::info("loading map '%s'...\n", name.data());
 			command::execute(utils::string::va("%s %s", is_singleplayer ? "loadzone" : "map", name.data()));
-			command::execute(utils::string::va("loadzone %s_load", name.data()));
+
+			game::qos::XZoneInfo zone_info
+			{
+				load_fastfile.data(),
+				xzone_alloc_map_load,
+				xzone_free_map_load
+			};
+			game::DB_LoadXAssets(&zone_info, 1, false);
 			game::DB_SyncXAssets();
 
 			// TODO: export sounds (Louve seems to have some big function for this, i'll do it later lol)

@@ -130,6 +130,21 @@ namespace game
 		InterlockedDecrement(lock);
 	}
 
+	void DB_LoadXAssets(qos::XZoneInfo* zone_info, int zone_count, bool sync)
+	{
+		const auto func_loc = game_offset(0x103E1CF0);
+		const auto sync_int = sync ? 1 : 0;
+
+		__asm
+		{
+			push sync_int
+			push zone_count
+			mov eax, zone_info
+			call func_loc
+			add esp, 8
+		}
+	}
+
 	void DB_SyncXAssets()
 	{
 		const auto func_loc = game_offset(0x103E1600);
