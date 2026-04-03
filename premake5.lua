@@ -142,12 +142,14 @@ workspace "qos-exp"
 		kind "SharedLib"
 		language "C++"
 		targetname "xport"
+		linkoptions { "/DEF:../src/xport.def" }
 
 		files
 		{
 			"./src/**.h",
 			"./src/**.hpp",
 			"./src/**.cpp",
+			"./src/**.def",
 		}
 
 		removefiles

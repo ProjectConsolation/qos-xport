@@ -4,6 +4,8 @@
 
 namespace
 {
+	bool g_no_overwrite = false;
+
 	std::filesystem::path get_launcher_log_path()
 	{
 		char path[MAX_PATH]{};
@@ -16,7 +18,7 @@ namespace
 
 	void append_launcher_log(const std::string& message)
 	{
-		const auto line = message + "\r\n";
+		const auto line = "[QoS-xport]: " + message + "\r\n";
 		OutputDebugStringA(line.c_str());
 
 		const auto path = get_launcher_log_path();
@@ -25,7 +27,7 @@ namespace
 			FILE_APPEND_DATA,
 			FILE_SHARE_READ | FILE_SHARE_WRITE,
 			nullptr,
-			OPEN_ALWAYS,
+			g_no_overwrite ? OPEN_ALWAYS : CREATE_ALWAYS,
 			FILE_ATTRIBUTE_NORMAL,
 			nullptr
 		);
@@ -46,18 +48,17 @@ namespace
 
 	void launcher_print(const std::string& message)
 	{
-		std::printf("%s\n", message.c_str());
+		std::printf("[QoS-xport]: %s\n", message.c_str());
 		std::fflush(stdout);
 		append_launcher_log(message);
 	}
 
 	int fail_and_wait(const char* message)
 	{
-		std::fprintf(stderr, "%s", message);
+		std::fprintf(stderr, "[QoS-xport]: %s", message);
 		std::fprintf(stderr, "\nPress Enter to close...\n");
 		std::fflush(stderr);
 		append_launcher_log(message);
-		append_launcher_log("Press Enter to close...");
 		std::getchar();
 		return 1;
 	}
@@ -158,6 +159,12 @@ namespace
 			if (argument == "--pause")
 			{
 				options.pause_on_success = true;
+				continue;
+			}
+
+			if (argument == "--no_overwrite")
+			{
+				g_no_overwrite = true;
 				continue;
 			}
 
@@ -384,7 +391,13 @@ namespace
 
 int main()
 {
-	append_launcher_log("========== QoS-xport launcher start ==========");
+	const auto log_path = get_launcher_log_path();
+	if (!g_no_overwrite)
+	{
+		DeleteFileA(log_path.string().c_str());
+	}
+
+	append_launcher_log("========== launcher start ==========");
 	append_launcher_log("QoS-xport: launcher cwd is " + std::filesystem::current_path().string());
 	const auto options = parse_command_line();
 	const auto base_directory = get_self_directory();

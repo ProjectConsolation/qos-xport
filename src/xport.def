@@ -1,0 +1,7 @@
+LIBRARY "xport"
+
+EXPORTS
+	qos_xport_init
+	qos_xport_remote_init
+	qos_xport_shutdown
+	qos_xport_is_initialized
