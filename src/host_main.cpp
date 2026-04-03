@@ -13,8 +13,18 @@ namespace
 {
 	utils::hook::detour g_xlive_patch_a;
 	utils::hook::detour g_xlive_patch_b;
+	utils::hook::detour g_splash_patch;
 
 	__declspec(naked) void xlive_ret_one_stub()
+	{
+		__asm
+		{
+			mov eax, 1
+			ret
+		}
+	}
+
+	__declspec(naked) void ret_success_stub()
 	{
 		__asm
 		{
@@ -180,9 +190,15 @@ namespace
 			host_print("patch detour 0x10240A30");
 			g_xlive_patch_b.create(game::game_offset(0x10240A30), xlive_ret_one_stub);
 			host_print("patch detour 0x10240A30 done");
+			host_print("patch jump 0x1024D8E9 -> 0x1024D909");
+			utils::hook::jump(game::game_offset(0x1024D8E9), game::game_offset(0x1024D909));
+			host_print("patch jump 0x1024D8E9 done");
 			host_print("patch nop 0x102489A1");
 			utils::hook::nop(game::game_offset(0x102489A1), 5);
 			host_print("patch nop 0x102489A1 done");
+			host_print("patch detour 0x102C3280");
+			g_splash_patch.create(game::game_offset(0x102C3280), ret_success_stub);
+			host_print("patch detour 0x102C3280 done");
 			host_print("early patches applied");
 		}
 		catch (const std::exception& error)
