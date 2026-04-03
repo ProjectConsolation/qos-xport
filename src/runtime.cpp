@@ -17,14 +17,10 @@ namespace
 
 	std::filesystem::path get_runtime_log_path()
 	{
-		char temp_path[MAX_PATH]{};
-		const auto length = GetTempPathA(MAX_PATH, temp_path);
-		if (length == 0 || length > MAX_PATH)
-		{
-			return std::filesystem::current_path() / "qos-xport-runtime.log";
-		}
-
-		return std::filesystem::path(temp_path) / "qos-xport-runtime.log";
+		auto path = std::filesystem::current_path() / "qos-xport";
+		std::error_code ec;
+		std::filesystem::create_directories(path, ec);
+		return path / "runtime.log";
 	}
 
 	void log_runtime_message(const std::string& message)
