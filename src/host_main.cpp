@@ -117,10 +117,7 @@ namespace
 	{
 		if (runtime::is_standalone_xport_mode() && key)
 		{
-			if (!_stricmp(key, "EXE_DISCONNECTED_FROM_SERVER"))
-			{
-				return "^1DISCONNECTED_FROM_SERVER^7";
-			}
+			return key;
 		}
 
 		return g_localize_lookup_patch.invoke<const char*>(const_cast<char*>(key));
