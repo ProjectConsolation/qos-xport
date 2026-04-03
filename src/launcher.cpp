@@ -4,6 +4,20 @@
 
 namespace
 {
+	int fail_and_wait(const char* message)
+	{
+		std::fprintf(stderr, "%s", message);
+		std::fprintf(stderr, "\nPress Enter to close...\n");
+		std::fflush(stderr);
+		std::getchar();
+		return 1;
+	}
+
+	int fail_and_wait(const std::string& message)
+	{
+		return fail_and_wait(message.c_str());
+	}
+
 	std::string narrow_string(const std::wstring& value)
 	{
 		if (value.empty())
@@ -227,14 +241,12 @@ int main()
 
 	if (!std::filesystem::exists(host_path))
 	{
-		std::fprintf(stderr, "QoS-xport: host executable not found: %s\n", host_path.c_str());
-		return 1;
+		return fail_and_wait("QoS-xport: host executable not found: " + host_path);
 	}
 
 	if (!std::filesystem::exists(runtime_path))
 	{
-		std::fprintf(stderr, "QoS-xport: runtime DLL not found: %s\n", runtime_path.c_str());
-		return 1;
+		return fail_and_wait("QoS-xport: runtime DLL not found: " + runtime_path);
 	}
 
 	auto command_line = build_host_command_line({
@@ -259,8 +271,7 @@ int main()
 		&startup_info,
 		&process_info))
 	{
-		std::fprintf(stderr, "QoS-xport: failed to launch host (%lu)\n", GetLastError());
-		return 1;
+		return fail_and_wait("QoS-xport: failed to launch host (" + std::to_string(GetLastError()) + ")");
 	}
 
 	const auto close_process_handles = gsl::finally([&]()
@@ -274,15 +285,13 @@ int main()
 
 	if (!wait_for_remote_module(process_info.dwProcessId, options.wait_module, 60s))
 	{
-		std::fprintf(stderr, "QoS-xport: timed out waiting for %s\n", options.wait_module.c_str());
-		return 1;
+		return fail_and_wait("QoS-xport: timed out waiting for " + options.wait_module);
 	}
 
 	std::printf("QoS-xport: injecting %s\n", runtime_path.c_str());
 	if (!inject_dll(process_info.hProcess, runtime_path))
 	{
-		std::fprintf(stderr, "QoS-xport: failed to inject runtime DLL\n");
-		return 1;
+		return fail_and_wait("QoS-xport: failed to inject runtime DLL");
 	}
 
 	std::printf("QoS-xport: runtime injected successfully\n");
