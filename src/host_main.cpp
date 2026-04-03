@@ -23,6 +23,7 @@ namespace
 	utils::hook::detour g_renderer_init_patch;
 	utils::hook::detour g_renderer_backend_begin_patch;
 	utils::hook::detour g_renderer_backend_end_patch;
+	utils::hook::detour g_sound_init_patch;
 	utils::hook::detour g_engine_printf_hook;
 	std::mutex g_output_mutex;
 	std::atomic_bool g_window_watch_kill = false;
@@ -83,6 +84,11 @@ namespace
 	int __cdecl renderer_backend_skip_stub()
 	{
 		return 0;
+	}
+
+	char __cdecl sound_init_skip_stub()
+	{
+		return 1;
 	}
 
 	std::filesystem::path get_host_log_path()
@@ -356,6 +362,9 @@ namespace
 			host_print("patch detour 0x103BF5C0");
 			g_renderer_backend_end_patch.create(game::game_offset(0x103BF5C0), renderer_backend_skip_stub);
 			host_print("patch detour 0x103BF5C0 done");
+			host_print("patch detour 0x104035F0");
+			g_sound_init_patch.create(game::game_offset(0x104035F0), sound_init_skip_stub);
+			host_print("patch detour 0x104035F0 done");
 			host_print("patch gfxConfig callsite 0x103F9A80");
 			utils::hook::set<std::uint8_t>(game::game_offset(0x103F9A80), 0xB0);
 			utils::hook::set<std::uint8_t>(game::game_offset(0x103F9A81), 0x01);
