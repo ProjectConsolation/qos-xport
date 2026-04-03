@@ -13,8 +13,8 @@
 
 namespace
 {
-	static BYTE original_code[5];
-	static PBYTE original_ep = 0;
+	std::mutex runtime_mutex;
+	bool runtime_initialized = false;
 
 	DECLSPEC_NORETURN void WINAPI exit_hook(const int code)
 	{
@@ -71,16 +71,14 @@ namespace
 		VirtualProtect(reinterpret_cast<LPVOID>(module), nt_header->OptionalHeader.SizeOfImage, PAGE_EXECUTE_READWRITE, &old_protect);
 	}
 
-	void main()
+	bool initialize_runtime(const bool report_errors)
 	{
-		/*
-		// unprotect our entire pe image
-		HMODULE module;
-		if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS, reinterpret_cast<LPCSTR>(main), &module))
+		std::lock_guard _(runtime_mutex);
+
+		if (runtime_initialized)
 		{
-			unprotect_module(module);
+			return true;
 		}
-		*/
 
 		ShowWindow(GetConsoleWindow(), SW_HIDE);
 		enable_dpi_awareness();
@@ -110,21 +108,67 @@ namespace
 					throw "component post load failed";
 				}
 			}
-			catch (std::string& error)
+			catch (const std::string& error)
 			{
 				component_loader::pre_destroy();
-				MessageBoxA(nullptr, error.data(), "ERROR", MB_ICONERROR);
-				return;
+
+				if (report_errors)
+				{
+					MessageBoxA(nullptr, error.data(), "ERROR", MB_ICONERROR);
+				}
+
+				return false;
 			}
 		}
+
+		runtime_initialized = true;
+		return true;
+	}
+
+	void shutdown_runtime()
+	{
+		std::lock_guard _(runtime_mutex);
+
+		if (!runtime_initialized)
+		{
+			return;
+		}
+
+		component_loader::pre_destroy();
+		runtime_initialized = false;
 	}
 }
 
-int WINAPI DllMain(HINSTANCE, const DWORD reason, LPVOID)
+extern "C" __declspec(dllexport) BOOL qos_xport_init()
+{
+	return initialize_runtime(true) ? TRUE : FALSE;
+}
+
+extern "C" __declspec(dllexport) void qos_xport_shutdown()
+{
+	shutdown_runtime();
+}
+
+extern "C" __declspec(dllexport) BOOL qos_xport_is_initialized()
+{
+	return runtime_initialized ? TRUE : FALSE;
+}
+
+int WINAPI DllMain(HINSTANCE instance, const DWORD reason, LPVOID)
 {
 	if (reason == DLL_PROCESS_ATTACH)
 	{
-		main();
+		DisableThreadLibraryCalls(instance);
+
+#ifdef QOS_XPORT_PROXY_LOADER
+		initialize_runtime(true);
+#endif
+	}
+	else if (reason == DLL_PROCESS_DETACH)
+	{
+#ifdef QOS_XPORT_PROXY_LOADER
+		shutdown_runtime();
+#endif
 	}
 
 	return 1;

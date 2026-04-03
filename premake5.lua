@@ -138,9 +138,10 @@ workspace "qos-exp"
 		defines { "DEBUG", "_DEBUG" }
 	filter  {}
 
-	project "d3d9" -- dll we are using to hook into the game
+project "d3d9" -- dll we are using to hook into the game
 		kind "SharedLib"
 		language "C++"
+		defines { "QOS_XPORT_PROXY_LOADER" }
 
 		files 
 		{
@@ -160,6 +161,39 @@ workspace "qos-exp"
 			"$(ProjectDir)src" -- fix for VS IDE
 		}
 	
+		pchheader "std_include.hpp"
+		pchsource "src/std_include.cpp"
+
+		dependencies.imports()
+
+	project "qos-xport"
+		kind "SharedLib"
+		language "C++"
+		targetname "qos-xport"
+
+		files
+		{
+			"./src/**.h",
+			"./src/**.hpp",
+			"./src/**.cpp",
+		}
+
+		removefiles
+		{
+			"./src/sdllp.cpp",
+		}
+
+		includedirs
+		{
+			"%{prj.location}/src",
+			"./src",
+		}
+
+		resincludedirs
+		{
+			"$(ProjectDir)src"
+		}
+
 		pchheader "std_include.hpp"
 		pchsource "src/std_include.cpp"
 
