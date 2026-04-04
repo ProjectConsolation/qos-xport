@@ -37,6 +37,7 @@ namespace
 	std::atomic_bool g_bootstrap_zone_redirected = false;
 	std::atomic_bool g_bootstrap_zones_ready = false;
 	std::atomic_bool g_bootstrap_zone_load_started = false;
+	std::atomic_bool g_debug_wait_consumed = false;
 	std::atomic_int g_fs_startup_count = 0;
 	bool g_debugbreak_bootstrap = false;
 	std::atomic_bool g_window_watch_kill = false;
@@ -201,8 +202,14 @@ namespace
 
 	char __cdecl exec_config_filter_stub(char* name, int a2, int a3, int a4)
 	{
-		if (runtime::is_standalone_xport_mode() && name)
+		if (runtime::is_standalone_xport_mode())
 		{
+			if (!name || !*name)
+			{
+				host_print("skipping empty config exec in xport mode");
+				return 1;
+			}
+
 			const auto lowered = lower_copy(name);
 			if (lowered.find("consolation_mp.cfg") != std::string::npos
 				|| lowered.find("config_mp.cfg") != std::string::npos)
@@ -519,6 +526,11 @@ namespace
 	void wait_for_debugger_if_requested(const char* stage)
 	{
 		if (!g_debugbreak_bootstrap)
+		{
+			return;
+		}
+
+		if (g_debug_wait_consumed.exchange(true))
 		{
 			return;
 		}
