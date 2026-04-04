@@ -32,6 +32,7 @@ namespace
 	utils::hook::detour g_localize_lookup_patch;
 	utils::hook::detour g_engine_printf_hook;
 	utils::hook::detour g_com_error_hook;
+	utils::hook::detour g_fs_startup_patch;
 	std::atomic_bool g_bootstrap_zone_redirected = false;
 	std::atomic_bool g_bootstrap_zones_ready = false;
 	std::atomic_bool g_bootstrap_zone_load_started = false;
@@ -59,6 +60,7 @@ namespace
 	void wait_for_debugger_if_requested();
 	std::string describe_zone_name(const char* name, bool trusted);
 	void perform_bootstrap_zone_load();
+	int __cdecl fs_startup_host_stub();
 	std::string hex_address(const std::uintptr_t address)
 	{
 		char buffer[16]{};
@@ -494,6 +496,19 @@ namespace
 		}
 	}
 
+	int __cdecl fs_startup_host_stub()
+	{
+		const auto result = g_fs_startup_patch.invoke<int>();
+
+		if (runtime::is_standalone_xport_mode() && !g_bootstrap_zone_load_started.exchange(true))
+		{
+			host_print("FS startup reached; loading bootstrap zones");
+			perform_bootstrap_zone_load();
+		}
+
+		return result;
+	}
+
 	bool should_debugbreak_bootstrap()
 	{
 		return g_debugbreak_bootstrap && IsDebuggerPresent();
@@ -620,6 +635,8 @@ namespace
 	{
 		while (!g_window_watch_kill.load())
 		{
+			SetConsoleTitleA("QoS-xport [v0.0.1-dev-debug]");
+
 			if (const auto window = FindWindowA("JB_MP", nullptr))
 			{
 				ShowWindow(window, SW_HIDE);
@@ -684,6 +701,7 @@ namespace
 			apply_detour(g_exec_config_patch, 0x103F5820, exec_config_filter_stub);
 			apply_detour(g_engine_printf_hook, 0x103F6400, engine_printf_stub);
 			apply_detour(g_com_error_hook, 0x103F77B0, com_error_stub);
+			apply_detour(g_fs_startup_patch, 0x10272D80, fs_startup_host_stub);
 
 			host_print("patching jumps...");
 			apply_jump(0x1024D8E9, 0x1024D909);
@@ -768,14 +786,6 @@ namespace
 		auto bootstrap_wait_start = GetTickCount64();
 		while (!g_bootstrap_zones_ready.load())
 		{
-			if (!g_bootstrap_zone_load_started.exchange(true) && g_fs_startup_count.load() > 0)
-			{
-				host_print("FS startup reached; loading ZoneTool-style bootstrap zones");
-				log_zone_load_request(zone_trace_manual, g_bootstrap_zones, static_cast<int>(std::size(g_bootstrap_zones)), 0);
-				game::DB_LoadXAssets(g_bootstrap_zones, static_cast<int>(std::size(g_bootstrap_zones)), false);
-				g_bootstrap_zones_ready = true;
-			}
-
 			const auto engine_wait = WaitForSingleObject(thread, 50);
 			if (engine_wait == WAIT_OBJECT_0)
 			{
