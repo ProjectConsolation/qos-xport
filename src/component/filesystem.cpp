@@ -209,14 +209,10 @@ namespace filesystem
 			if (runtime::is_standalone_xport_mode())
 			{
 				initialized = true;
-
-				filesystem::register_path(L".");
-				filesystem::register_path(L"qos-exp");
-				filesystem::register_path(L"devraw_shared");
-				filesystem::register_path(L"devraw");
-				filesystem::register_path(L"raw_shared");
-				filesystem::register_path(L"raw");
-				filesystem::register_path(L"main");
+				auto& search_paths = get_search_paths_internal();
+				search_paths.clear();
+				search_paths.push_back(L".");
+				search_paths.push_back(L"qos-exp");
 				return;
 			}
 
