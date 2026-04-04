@@ -777,6 +777,12 @@ namespace
 					" ESP=0x" + hex_address(ctx->Esp) +
 					" EIP=0x" + hex_address(ctx->Eip)
 				);
+
+				if (ctx->Esp && !IsBadReadPtr(reinterpret_cast<const void*>(ctx->Esp), sizeof(std::uint32_t)))
+				{
+					const auto return_address = *reinterpret_cast<const std::uint32_t*>(ctx->Esp);
+					append_log_line("[host] engine thread return address = 0x" + hex_address(return_address));
+				}
 			}
 		}
 		else
