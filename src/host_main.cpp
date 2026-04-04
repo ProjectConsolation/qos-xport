@@ -36,6 +36,7 @@ namespace
 	utils::hook::detour g_localize_lookup_patch;
 	utils::hook::detour g_engine_printf_hook;
 	utils::hook::detour g_com_error_hook;
+	utils::hook::detour g_init_popup_hook;
 	utils::hook::detour g_fs_startup_patch;
 	utils::hook::detour g_fs_readfile_patch;
 	std::atomic_bool g_bootstrap_zone_redirected = false;
@@ -44,6 +45,7 @@ namespace
 	std::atomic_bool g_debug_wait_consumed = false;
 	std::atomic_bool g_profile_config_skip_logged = false;
 	std::atomic_bool g_engine_error_seen = false;
+	std::atomic_bool g_init_popup_seen = false;
 	std::atomic_int g_fs_startup_count = 0;
 	bool g_debugbreak_bootstrap = false;
 	std::atomic_bool g_window_watch_kill = false;
@@ -75,6 +77,7 @@ namespace
 	int __cdecl profile_config_skip_stub(int controller, const char* source);
 	void fs_readfile_filter_stub();
 	LONG WINAPI host_exception_filter(_EXCEPTION_POINTERS* exception_info);
+	void __cdecl init_popup_stub(char* message);
 	std::string hex_address(const std::uintptr_t address)
 	{
 		char buffer[16]{};
@@ -536,6 +539,21 @@ namespace
 		g_com_error_hook.invoke<void>(a1, a2, a3, const_cast<char*>("%s"), message.c_str());
 	}
 
+	void __cdecl init_popup_stub(char* message)
+	{
+		g_init_popup_seen = true;
+		g_engine_error_seen = true;
+
+		std::string text = message ? message : "<null>";
+		{
+			std::lock_guard _(runtime::get_output_mutex());
+			write_console_line("[engine:init] " + text);
+			append_log_line("[engine:init] " + text);
+		}
+
+		g_init_popup_hook.invoke<void>(message);
+	}
+
 	std::string describe_zone_name(const char* name, const bool trusted)
 	{
 		if (!name)
@@ -883,6 +901,7 @@ namespace
 		host_print("loaded jb_mp_s.dll");
 		runtime::set_standalone_xport_mode(true);
 		g_engine_error_seen = false;
+		g_init_popup_seen = false;
 
 		try
 		{
@@ -910,6 +929,7 @@ namespace
 			apply_detour(g_fs_readfile_patch, 0x10271E40, fs_readfile_filter_stub);
 			apply_detour(g_engine_printf_hook, 0x103F6400, engine_printf_stub);
 			apply_detour(g_com_error_hook, 0x103F77B0, com_error_stub);
+			apply_detour(g_init_popup_hook, 0x10245050, init_popup_stub);
 			apply_detour(g_fs_startup_patch, 0x10272D80, fs_startup_host_stub);
 
 			host_section_print(make_host_section_line("[host - patch]", "======================="));
@@ -1071,7 +1091,7 @@ namespace
 				return fail_and_wait("engine thread exited before initialization completed");
 			}
 
-			if (g_engine_error_seen.load())
+			if (g_engine_error_seen.load() || g_init_popup_seen.load())
 			{
 				g_window_watch_kill = true;
 				if (g_window_watch_thread.joinable())
@@ -1082,7 +1102,7 @@ namespace
 			}
 		}
 
-		if (g_bootstrap_zones_ready.load() && !g_engine_error_seen.load())
+		if (g_bootstrap_zones_ready.load() && !g_engine_error_seen.load() && !g_init_popup_seen.load())
 		{
 			write_console_line("");
 			write_console_line("");
