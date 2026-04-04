@@ -7,6 +7,7 @@
 #include "component/entities.hpp"
 #include "component/map_dumper.hpp"
 #include "component/scheduler.hpp"
+#include "../runtime.hpp"
 
 #include "game/game.hpp"
 #include "game/structs.IW4.hpp"
@@ -194,6 +195,11 @@ namespace map_dumper
 		void post_load() override
 		{
 			api = new iw4of::api(get_params());
+
+			if (runtime::is_standalone_xport_mode())
+			{
+				return;
+			}
 
 			scheduler::once([&]()
 			{

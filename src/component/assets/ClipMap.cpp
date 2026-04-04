@@ -6,6 +6,7 @@
 #include "component/console.hpp"
 #include "component/map_dumper.hpp"
 #include "component/scheduler.hpp"
+#include "../../runtime.hpp"
 
 #include "game/game.hpp"
 #include "game/structs.IW4.hpp"
@@ -352,6 +353,11 @@ namespace clipmap
 	public:
 		void post_load() override
 		{
+			if (runtime::is_standalone_xport_mode())
+			{
+				return;
+			}
+
 			scheduler::once([&]()
 			{
 				const auto dump_command = [](const command::params& params)
