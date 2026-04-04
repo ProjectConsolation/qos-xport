@@ -211,7 +211,7 @@ namespace
 			if (!name || !*name)
 			{
 				host_print("skipping empty config exec in xport mode");
-				return 1;
+				return 0;
 			}
 
 			const auto lowered = lower_copy(name);
@@ -219,7 +219,7 @@ namespace
 				|| lowered.find("config_mp.cfg") != std::string::npos)
 			{
 				host_print(std::string("skipping config exec in xport mode: ") + name);
-				return 1;
+				return 0;
 			}
 		}
 
@@ -591,7 +591,6 @@ namespace
 		while (!IsDebuggerPresent())
 		{
 			SetConsoleTitleA(build_info::get_window_title().c_str());
-			write_console_line("[QoS-xport]: " + message);
 			Sleep(100);
 		}
 
@@ -791,6 +790,7 @@ namespace
 			host_print("patching jumps...");
 			apply_jump(0x1024D8E9, 0x1024D909);
 			apply_jump(0x103F7156, 0x103F7162);
+			apply_jump(0x103F7162, 0x103F71A7);
 			apply_jump(0x103F71B8, 0x103F721D);
 			apply_jump(0x103F9BC1, 0x103F9BD7);
 			apply_jump(0x103F9B5A, 0x103F9B85);
