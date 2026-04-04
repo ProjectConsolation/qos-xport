@@ -5,6 +5,7 @@
 #include "filesystem.hpp"
 #include "gsc.hpp"
 #include "scheduler.hpp"
+#include "../runtime.hpp"
 
 #include "game/game.hpp"
 
@@ -315,6 +316,11 @@ namespace gsc
 	public:
 		void post_load() override
 		{
+			if (runtime::is_standalone_xport_mode())
+			{
+				return;
+			}
+
 			// custom gsc functions/methods
 			//utils::hook::call(game::game_offset(0x10197711), player_get_method_stub);
 			//utils::hook::call(game::game_offset(0x10229B64), scr_get_function_stub);
