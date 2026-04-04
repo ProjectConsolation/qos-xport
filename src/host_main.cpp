@@ -469,36 +469,6 @@ namespace
 			return name;
 		}
 
-		std::string value;
-		__try
-		{
-			for (size_t i = 0; i < 96; ++i)
-			{
-				const char c = name[i];
-				if (c == '\0')
-				{
-					break;
-				}
-
-				if (static_cast<unsigned char>(c) < 0x20 || static_cast<unsigned char>(c) > 0x7E)
-				{
-					value.clear();
-					break;
-				}
-
-				value.push_back(c);
-			}
-		}
-		__except (EXCEPTION_EXECUTE_HANDLER)
-		{
-			value.clear();
-		}
-
-		if (!value.empty())
-		{
-			return value;
-		}
-
 		return "ptr=0x" + hex_address(reinterpret_cast<std::uintptr_t>(name));
 	}
 
