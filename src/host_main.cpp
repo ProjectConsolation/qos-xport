@@ -36,7 +36,7 @@ namespace
 	void* g_db_load_xassets_original = nullptr;
 	std::atomic_bool g_bootstrap_zone_redirected = false;
 	std::atomic_bool g_bootstrap_zones_ready = false;
-	std::mutex g_output_mutex;
+	bool g_debugbreak_bootstrap = false;
 	std::atomic_bool g_window_watch_kill = false;
 	std::atomic_bool g_window_hidden_logged = false;
 	std::thread g_window_watch_thread;
@@ -49,6 +49,11 @@ namespace
 	bool should_redirect_zone_load(game::qos::XZoneInfo* zone_info, int zone_count, int sync);
 	bool should_suppress_engine_line(const std::string& message);
 	std::string lower_copy(std::string value);
+	void log_zone_load_request(const char* source, game::qos::XZoneInfo* zone_info, int zone_count, int sync);
+	bool should_debugbreak_bootstrap();
+	void wait_for_debugger_if_requested();
+	const char* g_zone_trace_original = "original";
+	const char* g_zone_trace_redirect = "redirect";
 	std::string hex_address(const std::uintptr_t address)
 	{
 		char buffer[16]{};
@@ -265,14 +270,14 @@ namespace
 
 	void host_print(const std::string& message)
 	{
-		std::lock_guard _(g_output_mutex);
+		std::lock_guard _(runtime::get_output_mutex());
 		write_console_line("[QoS-xport]: " + message);
 		append_log_line("[host] " + message);
 	}
 
 	void host_patch_print(const std::string& message)
 	{
-		std::lock_guard _(g_output_mutex);
+		std::lock_guard _(runtime::get_output_mutex());
 		write_console_line(message);
 		append_log_line(message);
 	}
@@ -299,7 +304,7 @@ namespace
 
 	void engine_print(const std::string& message)
 	{
-		std::lock_guard _(g_output_mutex);
+		std::lock_guard _(runtime::get_output_mutex());
 		std::string normalized = message;
 		normalized.erase(std::remove(normalized.begin(), normalized.end(), '\r'), normalized.end());
 
@@ -393,14 +398,14 @@ namespace
 
 		if (!message.empty())
 		{
-			std::lock_guard _(g_output_mutex);
+			std::lock_guard _(runtime::get_output_mutex());
 			write_console_line("[engine:error] " + message);
 			append_log_line("[engine:error] " + message);
 		}
 
 		if (runtime::is_standalone_xport_mode() && should_suppress_engine_error(message))
 		{
-			std::lock_guard _(g_output_mutex);
+			std::lock_guard _(runtime::get_output_mutex());
 			write_console_line("[QoS-xport] suppressed non-fatal engine error in xport mode");
 			append_log_line("[host] suppressed non-fatal engine error in xport mode");
 			return;
@@ -440,6 +445,50 @@ namespace
 		return true;
 	}
 
+	void log_zone_load_request(const char* source, game::qos::XZoneInfo* zone_info, int zone_count, int sync)
+	{
+		if (!runtime::is_standalone_xport_mode() || !zone_info || zone_count <= 0)
+		{
+			return;
+		}
+
+		std::string message = std::string(source) + " zone_count=" + std::to_string(zone_count) + " sync=" + std::to_string(sync ? 1 : 0) + " zones=[";
+		for (int i = 0; i < zone_count; ++i)
+		{
+			if (i > 0)
+			{
+				message += ", ";
+			}
+
+			message += zone_info[i].name ? zone_info[i].name : "<null>";
+		}
+		message += "]";
+
+		host_print(message);
+	}
+
+	bool should_debugbreak_bootstrap()
+	{
+		return g_debugbreak_bootstrap && IsDebuggerPresent();
+	}
+
+	void wait_for_debugger_if_requested()
+	{
+		if (!g_debugbreak_bootstrap)
+		{
+			return;
+		}
+
+		host_print("debug env enabled; waiting for debugger to attach...");
+		while (!IsDebuggerPresent())
+		{
+			Sleep(100);
+		}
+
+		host_print("debugger attached");
+		DebugBreak();
+	}
+
 	__declspec(naked) void db_load_xassets_stub()
 	{
 		__asm
@@ -451,12 +500,31 @@ namespace
 			push dword ptr [ebp + 12]
 			push dword ptr [ebp + 8]
 			push edx
+			push offset g_zone_trace_original
+			call log_zone_load_request
+			add esp, 16
+			push dword ptr [ebp + 12]
+			push dword ptr [ebp + 8]
+			push edx
 			call should_redirect_zone_load
 			add esp, 12
 			mov bl, al
 			popad
 			test bl, bl
 			jz continue_original
+			call should_debugbreak_bootstrap
+			test al, al
+			jz no_break
+			int 3
+		no_break:
+			pushad
+			push 0
+			push 5
+			push offset g_bootstrap_zones
+			push offset g_zone_trace_redirect
+			call log_zone_load_request
+			add esp, 16
+			popad
 			mov eax, offset g_bootstrap_zones
 			push 0
 			push 5
@@ -598,6 +666,7 @@ namespace
 
 		host_print("loaded jb_mp_s.dll");
 		runtime::set_standalone_xport_mode(true);
+		wait_for_debugger_if_requested();
 
 		try
 		{
@@ -693,7 +762,7 @@ namespace
 			return fail_and_wait("engine thread exited before runtime initialization (" + std::to_string(exit_code) + ")");
 		}
 
-		host_print("waiting for ZoneTool-style bootstrap zones before runtime init");
+		host_print("waiting for bootstrap zones before runtime init");
 		auto bootstrap_wait_start = GetTickCount64();
 		while (!g_bootstrap_zones_ready.load())
 		{
@@ -824,6 +893,10 @@ int main()
 			if (arg == L"--inject")
 			{
 				return run_launcher_mode();
+			}
+			if (arg == L"-debug_env")
+			{
+				g_debugbreak_bootstrap = true;
 			}
 		}
 	}

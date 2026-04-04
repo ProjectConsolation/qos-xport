@@ -1,5 +1,7 @@
 #pragma once
 
+#include <mutex>
+
 namespace runtime
 {
 	void set_standalone_xport_mode(bool enabled);
@@ -7,4 +9,5 @@ namespace runtime
 	bool initialize(bool report_errors);
 	void shutdown();
 	bool is_initialized();
+	std::mutex& get_output_mutex();
 }

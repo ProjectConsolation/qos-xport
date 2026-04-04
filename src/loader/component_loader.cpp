@@ -1,10 +1,13 @@
 #include <std_include.hpp>
 #include "component_loader.hpp"
+#include "../runtime.hpp"
 
 namespace
 {
 	void write_console_line(const std::string& line)
 	{
+		std::lock_guard _(runtime::get_output_mutex());
+
 		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
 		if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
 		{

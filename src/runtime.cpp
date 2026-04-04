@@ -13,6 +13,7 @@
 namespace
 {
 	std::mutex runtime_mutex;
+	std::mutex output_mutex;
 	bool runtime_initialized = false;
 	bool runtime_log_cleared = false;
 	std::atomic_bool standalone_xport_mode = false;
@@ -204,5 +205,10 @@ namespace runtime
 	bool is_initialized()
 	{
 		return runtime_initialized;
+	}
+
+	std::mutex& get_output_mutex()
+	{
+		return output_mutex;
 	}
 }
