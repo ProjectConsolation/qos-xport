@@ -32,6 +32,10 @@ namespace
 	utils::hook::detour g_localize_lookup_patch;
 	utils::hook::detour g_engine_printf_hook;
 	utils::hook::detour g_com_error_hook;
+	utils::hook::detour g_db_load_xassets_hook;
+	void* g_db_load_xassets_original = nullptr;
+	std::atomic_bool g_bootstrap_zone_redirected = false;
+	std::atomic_bool g_bootstrap_zones_ready = false;
 	std::mutex g_output_mutex;
 	std::atomic_bool g_window_watch_kill = false;
 	std::atomic_bool g_window_hidden_logged = false;
@@ -41,6 +45,25 @@ namespace
 	void host_print(const std::string& message);
 	void write_console_line(const std::string& line);
 	bool should_suppress_engine_error(const std::string& message);
+	bool should_redirect_zone_load(game::qos::XZoneInfo* zone_info, int zone_count, int sync);
+
+	constexpr std::array<const char*, 5> g_bootstrap_zone_names =
+	{
+		"code_pre_gfx_mp",
+		"localized_code_pre_gfx_mp",
+		"code_post_gfx_mp",
+		"localized_code_post_gfx_mp",
+		"common_mp"
+	};
+
+	game::qos::XZoneInfo g_bootstrap_zones[] =
+	{
+		{ g_bootstrap_zone_names[0], 0, 0 },
+		{ g_bootstrap_zone_names[1], 0, 0 },
+		{ g_bootstrap_zone_names[2], 0, 0 },
+		{ g_bootstrap_zone_names[3], 0, 0 },
+		{ g_bootstrap_zone_names[4], 0, 0 },
+	};
 
 	__declspec(naked) void xlive_ret_one_stub()
 	{
@@ -319,6 +342,69 @@ namespace
 		g_com_error_hook.invoke<void>(a1, a2, a3, const_cast<char*>("%s"), message.c_str());
 	}
 
+	bool should_redirect_zone_load(game::qos::XZoneInfo* zone_info, int zone_count, int)
+	{
+		if (!runtime::is_standalone_xport_mode() || !zone_info || zone_count <= 0)
+		{
+			return false;
+		}
+
+		for (int i = 0; i < zone_count; ++i)
+		{
+			const auto* name = zone_info[i].name;
+			if (!name)
+			{
+				return false;
+			}
+
+			const auto zone_name = utils::string::to_lower(name);
+			if (zone_name != "configuration_mp" && zone_name != "localized_configuration_mp")
+			{
+				return false;
+			}
+		}
+
+		if (!g_bootstrap_zone_redirected.exchange(true))
+		{
+			host_print("redirecting configuration_mp zone bootstrap to ZoneTool-style default zones");
+		}
+
+		g_bootstrap_zones_ready = true;
+		return true;
+	}
+
+	__declspec(naked) void db_load_xassets_stub()
+	{
+		__asm
+		{
+			push ebp
+			mov ebp, esp
+			mov edx, eax
+			pushad
+			push dword ptr [ebp + 12]
+			push dword ptr [ebp + 8]
+			push edx
+			call should_redirect_zone_load
+			add esp, 12
+			mov bl, al
+			popad
+			test bl, bl
+			jz continue_original
+			mov eax, offset g_bootstrap_zones
+			push 0
+			push 5
+			call dword ptr [g_db_load_xassets_original]
+			add esp, 8
+			mov esp, ebp
+			pop ebp
+			ret
+		continue_original:
+			mov esp, ebp
+			pop ebp
+			jmp dword ptr [g_db_load_xassets_original]
+		}
+	}
+
 	void __cdecl host_terminate_handler()
 	{
 		append_log_line("[host] CRT terminate handler invoked");
@@ -532,6 +618,10 @@ namespace
 			host_print("patch detour 0x103F77B0");
 			g_com_error_hook.create(game::game_offset(0x103F77B0), com_error_stub);
 			host_print("patch detour 0x103F77B0 done");
+			host_print("patch detour 0x103E1CF0");
+			g_db_load_xassets_hook.create(game::game_offset(0x103E1CF0), db_load_xassets_stub);
+			g_db_load_xassets_original = g_db_load_xassets_hook.get_original();
+			host_print("patch detour 0x103E1CF0 done");
 			host_print("early patches applied");
 		}
 		catch (const std::exception& error)
@@ -597,13 +687,30 @@ namespace
 			return fail_and_wait("runtime initialization failed");
 		}
 
-		write_console_line("");
-		write_console_line("");
-		write_console_line("");
-		write_console_line("[QoS-xport: init] =========== initialization complete =============");
-		write_console_line("[QoS-xport] type 'help' for a list of commands, or 'quit' to exit");
-		append_log_line("[host] initialization complete");
-		append_log_line("[host] type 'help' for a list of commands, or 'quit' to exit");
+		while (!g_bootstrap_zones_ready.load())
+		{
+			const auto engine_wait = WaitForSingleObject(thread, 50);
+			if (engine_wait == WAIT_OBJECT_0)
+			{
+				DWORD exit_code = 0;
+				if (GetExitCodeThread(thread, &exit_code))
+				{
+					host_print("engine thread exited before bootstrap zones completed (" + std::to_string(exit_code) + ")");
+				}
+				break;
+			}
+		}
+
+		if (g_bootstrap_zones_ready.load())
+		{
+			write_console_line("");
+			write_console_line("");
+			write_console_line("");
+			write_console_line("[QoS-xport: init] =========== initialization complete =============");
+			write_console_line("[QoS-xport] type 'help' for a list of commands, or 'quit' to exit");
+			append_log_line("[host] initialization complete");
+			append_log_line("[host] type 'help' for a list of commands, or 'quit' to exit");
+		}
 
 		std::string line;
 		while (true)
