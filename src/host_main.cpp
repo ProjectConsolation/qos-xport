@@ -40,6 +40,7 @@ namespace
 	void append_log_line(const std::string& line);
 	void host_print(const std::string& message);
 	void write_console_line(const std::string& line);
+	bool should_suppress_engine_error(const std::string& message);
 
 	__declspec(naked) void xlive_ret_one_stub()
 	{
@@ -266,6 +267,33 @@ namespace
 		engine_print(message);
 	}
 
+	bool should_suppress_engine_error(const std::string& message)
+	{
+		auto lowered = message;
+		std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](unsigned char c)
+		{
+			return static_cast<char>(std::tolower(c));
+		});
+
+		static const std::array<const char*, 4> suppressed_patterns =
+		{
+			"exe_disconnected_from_server",
+			"failed to create xbox live notification listener",
+			"unable to find an xnaddr",
+			"fs_readfile"
+		};
+
+		for (const auto* pattern : suppressed_patterns)
+		{
+			if (lowered.find(pattern) != std::string::npos)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	void com_error_stub(int a1, int a2, int a3, char* format, ...)
 	{
 		va_list ap;
@@ -278,6 +306,14 @@ namespace
 			std::lock_guard _(g_output_mutex);
 			write_console_line("[engine:error] " + message);
 			append_log_line("[engine:error] " + message);
+		}
+
+		if (runtime::is_standalone_xport_mode() && should_suppress_engine_error(message))
+		{
+			std::lock_guard _(g_output_mutex);
+			write_console_line("[QoS-xport] suppressed non-fatal engine error in xport mode");
+			append_log_line("[host] suppressed non-fatal engine error in xport mode");
+			return;
 		}
 
 		g_com_error_hook.invoke<void>(a1, a2, a3, const_cast<char*>("%s"), message.c_str());
