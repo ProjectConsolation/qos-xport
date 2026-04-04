@@ -60,6 +60,7 @@ namespace
 	void log_zone_load_request(int source, game::qos::XZoneInfo* zone_info, int zone_count, int sync);
 	bool should_debugbreak_bootstrap();
 	void wait_for_debugger_if_requested();
+	std::string describe_zone_name(const char* name, bool trusted);
 	std::string hex_address(const std::uintptr_t address)
 	{
 		char buffer[16]{};
@@ -452,8 +453,53 @@ namespace
 			host_print("redirecting configuration_mp zone bootstrap to ZoneTool-style default zones");
 		}
 
-		g_bootstrap_zones_ready = true;
+	g_bootstrap_zones_ready = true;
 		return true;
+	}
+
+	std::string describe_zone_name(const char* name, const bool trusted)
+	{
+		if (!name)
+		{
+			return "<null>";
+		}
+
+		if (trusted)
+		{
+			return name;
+		}
+
+		std::string value;
+		__try
+		{
+			for (size_t i = 0; i < 96; ++i)
+			{
+				const char c = name[i];
+				if (c == '\0')
+				{
+					break;
+				}
+
+				if (static_cast<unsigned char>(c) < 0x20 || static_cast<unsigned char>(c) > 0x7E)
+				{
+					value.clear();
+					break;
+				}
+
+				value.push_back(c);
+			}
+		}
+		__except (EXCEPTION_EXECUTE_HANDLER)
+		{
+			value.clear();
+		}
+
+		if (!value.empty())
+		{
+			return value;
+		}
+
+		return "ptr=0x" + hex_address(reinterpret_cast<std::uintptr_t>(name));
 	}
 
 	void log_zone_load_request(int source, game::qos::XZoneInfo* zone_info, int zone_count, int sync)
@@ -479,6 +525,7 @@ namespace
 			break;
 		}
 
+		const bool trusted_names = (source == zone_trace_manual);
 		std::string message = std::string(source_name) + " zone_count=" + std::to_string(zone_count) + " sync=" + std::to_string(sync ? 1 : 0) + " zones=[";
 		for (int i = 0; i < zone_count; ++i)
 		{
@@ -487,7 +534,7 @@ namespace
 				message += ", ";
 			}
 
-			message += zone_info[i].name ? zone_info[i].name : "<null>";
+			message += describe_zone_name(zone_info[i].name, trusted_names);
 		}
 		message += "]";
 
