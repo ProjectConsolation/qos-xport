@@ -647,6 +647,7 @@ namespace
 		DeleteFileA(log_path.string().c_str());
 		set_terminate(host_terminate_handler);
 		_set_invalid_parameter_handler(host_invalid_parameter_handler);
+		SetConsoleTitleA("QoS-xport [v0.0.1-dev-debug]");
 
 		host_print("========== qos-xport initializing ==========");
 

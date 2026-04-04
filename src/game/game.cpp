@@ -139,9 +139,9 @@ namespace game
 		{
 			push sync_int
 			push zone_count
-			mov eax, zone_info
+			push zone_info
 			call func_loc
-			add esp, 8
+			add esp, 12
 		}
 	}
 
