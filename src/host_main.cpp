@@ -34,6 +34,7 @@ namespace
 	utils::hook::detour g_engine_printf_hook;
 	utils::hook::detour g_com_error_hook;
 	utils::hook::detour g_fs_startup_patch;
+	utils::hook::detour g_fs_readfile_patch;
 	std::atomic_bool g_bootstrap_zone_redirected = false;
 	std::atomic_bool g_bootstrap_zones_ready = false;
 	std::atomic_bool g_bootstrap_zone_load_started = false;
@@ -63,6 +64,9 @@ namespace
 	std::string describe_zone_name(const char* name, bool trusted);
 	void perform_bootstrap_zone_load();
 	int __cdecl fs_startup_host_stub();
+	int __cdecl fs_readfile_filter_impl(char* name, void** out_buffer, int flags);
+	int __cdecl invoke_original_fs_readfile(char* name, void** out_buffer, int flags);
+	void fs_readfile_filter_stub();
 	LONG WINAPI host_exception_filter(_EXCEPTION_POINTERS* exception_info);
 	std::string hex_address(const std::uintptr_t address)
 	{
@@ -220,6 +224,53 @@ namespace
 		}
 
 		return g_exec_config_patch.invoke<char>(name, a2, a3, a4);
+	}
+
+	int __cdecl invoke_original_fs_readfile(char* name, void** out_buffer, int flags)
+	{
+		auto* original = g_fs_readfile_patch.get_original();
+		int result = -1;
+
+		__asm
+		{
+			mov eax, name
+			push flags
+			push out_buffer
+			call original
+			add esp, 8
+			mov result, eax
+		}
+
+		return result;
+	}
+
+	int __cdecl fs_readfile_filter_impl(char* name, void** out_buffer, int flags)
+	{
+		if (runtime::is_standalone_xport_mode() && (!name || !*name))
+		{
+			if (out_buffer)
+			{
+				*out_buffer = nullptr;
+			}
+
+			host_print("skipping empty FS_ReadFile request in xport mode");
+			return -1;
+		}
+
+		return invoke_original_fs_readfile(name, out_buffer, flags);
+	}
+
+	__declspec(naked) void fs_readfile_filter_stub()
+	{
+		__asm
+		{
+			push dword ptr [esp + 8]
+			push dword ptr [esp + 8]
+			push eax
+			call fs_readfile_filter_impl
+			add esp, 12
+			ret
+		}
 	}
 
 	std::string lower_copy(std::string value)
@@ -535,9 +586,12 @@ namespace
 			return;
 		}
 
-		host_print(std::string("[debug - wait] attach a debugger now (") + stage + ")");
+		const auto message = std::string("[debug - wait] attach a debugger now (") + stage + ")";
+		host_print(message);
 		while (!IsDebuggerPresent())
 		{
+			SetConsoleTitleA(build_info::get_window_title().c_str());
+			write_console_line("[QoS-xport]: " + message);
 			Sleep(100);
 		}
 
@@ -729,6 +783,7 @@ namespace
 			apply_detour(g_client_disconnect_patch, 0x1031E840, client_disconnect_skip_stub);
 			apply_detour(g_localize_lookup_patch, 0x102DA9B0, localize_lookup_filter_stub);
 			apply_detour(g_exec_config_patch, 0x103F5820, exec_config_filter_stub);
+			apply_detour(g_fs_readfile_patch, 0x10271E40, fs_readfile_filter_stub);
 			apply_detour(g_engine_printf_hook, 0x103F6400, engine_printf_stub);
 			apply_detour(g_com_error_hook, 0x103F77B0, com_error_stub);
 			apply_detour(g_fs_startup_patch, 0x10272D80, fs_startup_host_stub);
