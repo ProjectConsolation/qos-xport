@@ -525,19 +525,29 @@ namespace
 		}
 
 		const bool trusted_names = (source == zone_trace_manual);
-		std::string message = std::string(source_name) + " zone_count=" + std::to_string(zone_count) + " sync=" + std::to_string(sync ? 1 : 0) + " zones=[";
+		host_print(std::string(source_name) + " zone_count=" + std::to_string(zone_count));
+		host_print(std::string("[host - zone sync] sync=") + std::to_string(sync ? 1 : 0));
+		host_print("[host - zones] =======================");
 		for (int i = 0; i < zone_count; ++i)
 		{
-			if (i > 0)
-			{
-				message += ", ";
-			}
-
-			message += describe_zone_name(zone_info[i].name, trusted_names);
+			host_print(std::string("[host - zones] ") + describe_zone_name(zone_info[i].name, trusted_names));
 		}
-		message += "]";
+		host_print("[host - zones] =======================");
+	}
 
-		host_print(message);
+	void log_file_load_refs()
+	{
+		host_print("[host - refs] =======================");
+		host_print("[host - refs] FS_Startup=0x10272D80");
+		host_print("[host - refs] ExecConfig=0x103F5820");
+		host_print("[host - refs] Scr_ReadFile_FastFile=0x1022DF13");
+		host_print("[host - refs] DB_LoadXAssets=0x103E1CF0");
+		host_print("[host - refs] =======================");
+	}
+
+	void reinforce_engine_imports()
+	{
+		utils::hook::set<void*>(game::game_offset(0x104761C4), reinterpret_cast<void*>(::SwitchToThread));
 	}
 
 	void perform_bootstrap_zone_load()
@@ -847,8 +857,9 @@ namespace
 			utils::hook::nop(game::game_offset(0x103F7665), 5);
 			host_patch_print("[patch - nop] 0x103209F8 (5 bytes)");
 			utils::hook::nop(game::game_offset(0x103209F8), 5);
+			reinforce_engine_imports();
 			host_patch_print("[host - patch] all patches applied");
-			host_print("file load refs: FS_Startup=0x10272D80 ExecConfig=0x103F5820 Scr_ReadFile_FastFile=0x1022DF13 DB_LoadXAssets=0x103E1CF0");
+			log_file_load_refs();
 		}
 		catch (const std::exception& error)
 		{
