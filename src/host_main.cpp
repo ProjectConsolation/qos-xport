@@ -1,6 +1,7 @@
 #include <std_include.hpp>
 
 #include "launcher.hpp"
+#include "build_info.hpp"
 #include "component/command.hpp"
 #include "runtime.hpp"
 #include "game/game.hpp"
@@ -61,6 +62,7 @@ namespace
 	std::string describe_zone_name(const char* name, bool trusted);
 	void perform_bootstrap_zone_load();
 	int __cdecl fs_startup_host_stub();
+	LONG WINAPI host_exception_filter(_EXCEPTION_POINTERS* exception_info);
 	std::string hex_address(const std::uintptr_t address)
 	{
 		char buffer[16]{};
@@ -521,14 +523,29 @@ namespace
 			return;
 		}
 
-		write_console_line(std::string("[debug - wait] attach a debugger now (") + stage + ")");
-		append_log_line(std::string("[host] debug env waiting for debugger attach (") + stage + ")");
+		host_print(std::string("[debug - wait] attach a debugger now (") + stage + ")");
 		while (!IsDebuggerPresent())
 		{
 			Sleep(100);
 		}
 
-		append_log_line(std::string("[host] debug env attached (") + stage + ")");
+		host_print(std::string("debugger attached (") + stage + ")");
+	}
+
+	LONG WINAPI host_exception_filter(_EXCEPTION_POINTERS* exception_info)
+	{
+		if (exception_info && exception_info->ExceptionRecord)
+		{
+			const auto code = exception_info->ExceptionRecord->ExceptionCode;
+			const auto address = reinterpret_cast<std::uintptr_t>(exception_info->ExceptionRecord->ExceptionAddress);
+			append_log_line("[host] unhandled exception code=0x" + hex_address(code) + " address=0x" + hex_address(address));
+		}
+		else
+		{
+			append_log_line("[host] unhandled exception with no exception record");
+		}
+
+		return EXCEPTION_CONTINUE_SEARCH;
 	}
 
 	__declspec(naked) void bootstrap_zone_load_stub()
@@ -635,7 +652,7 @@ namespace
 	{
 		while (!g_window_watch_kill.load())
 		{
-			SetConsoleTitleA("QoS-xport [v0.0.1-dev-debug]");
+			SetConsoleTitleA(build_info::get_window_title().c_str());
 
 			if (const auto window = FindWindowA("JB_MP", nullptr))
 			{
@@ -664,7 +681,8 @@ namespace
 		DeleteFileA(log_path.string().c_str());
 		set_terminate(host_terminate_handler);
 		_set_invalid_parameter_handler(host_invalid_parameter_handler);
-		SetConsoleTitleA("QoS-xport [v0.0.1-dev-debug]");
+		SetUnhandledExceptionFilter(host_exception_filter);
+		SetConsoleTitleA(build_info::get_window_title().c_str());
 
 		host_print("========== qos-xport initializing ==========");
 
