@@ -1,6 +1,7 @@
 #include <std_include.hpp>
 
 #include "launcher.hpp"
+#include "component/command.hpp"
 #include "runtime.hpp"
 #include "game/game.hpp"
 
@@ -238,7 +239,11 @@ namespace
 		const auto message = format_message(&ap, fmt);
 		va_end(ap);
 
-		g_engine_printf_hook.invoke<void>(channel, "%s", message.c_str());
+		if (!runtime::is_standalone_xport_mode())
+		{
+			g_engine_printf_hook.invoke<void>(channel, "%s", message.c_str());
+		}
+
 		engine_print(message);
 	}
 
@@ -526,6 +531,11 @@ namespace
 			if (line == "quit" || line == "exit")
 			{
 				break;
+			}
+
+			if (!line.empty() && command::execute_local(line))
+			{
+				continue;
 			}
 
 			if (!line.empty())

@@ -25,4 +25,5 @@ namespace command
 	void add(const char* name, const std::function<void(const params&)>& callback);
 	void add(const char* name, const std::function<void()>& callback);
 	void execute(std::string command);
+	bool execute_local(const std::string& command_line);
 }
