@@ -890,8 +890,18 @@ namespace
 		SetConsoleTitleA(build_info::get_window_title().c_str());
 
 		host_print("========== qos-xport initializing ==========");
+		host_print("loading jb_mp_s.dll...");
 
-		const auto module = LoadLibraryA("jb_mp_s.dll");
+		HMODULE module = nullptr;
+		__try
+		{
+			module = LoadLibraryA("jb_mp_s.dll");
+		}
+		__except (handle_engine_thread_exception(GetExceptionInformation()))
+		{
+			return fail_and_wait("exception while loading jb_mp_s.dll");
+		}
+
 		if (!module)
 		{
 			return fail_and_wait("failed to load jb_mp_s.dll (" + std::to_string(GetLastError()) + ")");
