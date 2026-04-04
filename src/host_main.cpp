@@ -51,11 +51,15 @@ namespace
 	bool should_redirect_zone_load(game::qos::XZoneInfo* zone_info, int zone_count, int sync);
 	bool should_suppress_engine_line(const std::string& message);
 	std::string lower_copy(std::string value);
-	void log_zone_load_request(const char* source, game::qos::XZoneInfo* zone_info, int zone_count, int sync);
+	enum zone_trace_source
+	{
+		zone_trace_original = 0,
+		zone_trace_redirect = 1,
+		zone_trace_manual = 2,
+	};
+	void log_zone_load_request(int source, game::qos::XZoneInfo* zone_info, int zone_count, int sync);
 	bool should_debugbreak_bootstrap();
 	void wait_for_debugger_if_requested();
-	const char g_zone_trace_original[] = "original";
-	const char g_zone_trace_redirect[] = "redirect";
 	std::string hex_address(const std::uintptr_t address)
 	{
 		char buffer[16]{};
@@ -452,14 +456,30 @@ namespace
 		return true;
 	}
 
-	void log_zone_load_request(const char* source, game::qos::XZoneInfo* zone_info, int zone_count, int sync)
+	void log_zone_load_request(int source, game::qos::XZoneInfo* zone_info, int zone_count, int sync)
 	{
 		if (!runtime::is_standalone_xport_mode() || !zone_info || zone_count <= 0)
 		{
 			return;
 		}
 
-		std::string message = std::string(source) + " zone_count=" + std::to_string(zone_count) + " sync=" + std::to_string(sync ? 1 : 0) + " zones=[";
+		const char* source_name = "unknown";
+		switch (source)
+		{
+		case zone_trace_original:
+			source_name = "original";
+			break;
+		case zone_trace_redirect:
+			source_name = "redirect";
+			break;
+		case zone_trace_manual:
+			source_name = "manual";
+			break;
+		default:
+			break;
+		}
+
+		std::string message = std::string(source_name) + " zone_count=" + std::to_string(zone_count) + " sync=" + std::to_string(sync ? 1 : 0) + " zones=[";
 		for (int i = 0; i < zone_count; ++i)
 		{
 			if (i > 0)
@@ -507,7 +527,7 @@ namespace
 			push dword ptr [ebp + 12]
 			push dword ptr [ebp + 8]
 			push edx
-			push offset g_zone_trace_original
+			push zone_trace_original
 			call log_zone_load_request
 			add esp, 16
 			push dword ptr [ebp + 12]
@@ -528,7 +548,7 @@ namespace
 			push 0
 			push 5
 			push offset g_bootstrap_zones
-			push offset g_zone_trace_redirect
+			push zone_trace_redirect
 			call log_zone_load_request
 			add esp, 16
 			popad
@@ -713,6 +733,7 @@ namespace
 			host_print("patching callsites...");
 			apply_gfxconfig_callsite_patch();
 			host_patch_print("[host - patch] all patches applied");
+			host_print("file load refs: FS_Startup=0x10272D80 ExecConfig=0x103F5820 Scr_ReadFile_FastFile=0x1022DF13 DB_LoadXAssets=0x103E1CF0");
 		}
 		catch (const std::exception& error)
 		{
@@ -779,7 +800,7 @@ namespace
 			if (!g_bootstrap_zone_load_started.exchange(true) && g_fs_startup_count.load() > 0)
 			{
 				host_print("FS startup reached; loading ZoneTool-style bootstrap zones");
-				log_zone_load_request("manual", g_bootstrap_zones, static_cast<int>(std::size(g_bootstrap_zones)), 0);
+				log_zone_load_request(zone_trace_manual, g_bootstrap_zones, static_cast<int>(std::size(g_bootstrap_zones)), 0);
 				game::DB_LoadXAssets(g_bootstrap_zones, static_cast<int>(std::size(g_bootstrap_zones)), false);
 				g_bootstrap_zones_ready = true;
 				break;
