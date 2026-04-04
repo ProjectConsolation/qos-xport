@@ -38,6 +38,7 @@ namespace
 
 	void append_log_line(const std::string& line);
 	void host_print(const std::string& message);
+	void write_console_line(const std::string& line);
 
 	__declspec(naked) void xlive_ret_one_stub()
 	{
@@ -199,9 +200,28 @@ namespace
 	void host_print(const std::string& message)
 	{
 		std::lock_guard _(g_output_mutex);
-		std::printf("[QoS-xport]: %s\n", message.c_str());
-		std::fflush(stdout);
+		write_console_line("[QoS-xport]: " + message);
 		append_log_line("[host] " + message);
+	}
+
+	void write_console_line(const std::string& line)
+	{
+		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
+		if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
+		{
+			DWORD mode = 0;
+			if (GetConsoleMode(handle, &mode))
+			{
+				const auto with_newline = line + "\r\n";
+				DWORD written = 0;
+				WriteConsoleA(handle, with_newline.data(), static_cast<DWORD>(with_newline.size()), &written, nullptr);
+				return;
+			}
+		}
+
+		std::fwrite(line.data(), 1, line.size(), stdout);
+		std::fwrite("\n", 1, 1, stdout);
+		std::fflush(stdout);
 	}
 
 	void engine_print(const std::string& message)
@@ -217,7 +237,7 @@ namespace
 			auto line = normalized.substr(start, end == std::string::npos ? std::string::npos : end - start);
 			if (!line.empty())
 			{
-				std::printf("[engine] %s\n", line.c_str());
+				write_console_line("[engine] " + line);
 				append_log_line("[engine] " + line);
 			}
 
@@ -228,8 +248,6 @@ namespace
 
 			start = end + 1;
 		}
-
-		std::fflush(stdout);
 	}
 
 	void engine_printf_stub(int channel, const char* fmt, ...)
