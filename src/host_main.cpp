@@ -44,8 +44,10 @@ namespace
 	void append_log_line(const std::string& line);
 	void host_print(const std::string& message);
 	void write_console_line(const std::string& line);
+	void host_patch_print(const std::string& message);
 	bool should_suppress_engine_error(const std::string& message);
 	bool should_redirect_zone_load(game::qos::XZoneInfo* zone_info, int zone_count, int sync);
+	bool should_suppress_engine_line(const std::string& message);
 
 	constexpr std::array<const char*, 5> g_bootstrap_zone_names =
 	{
@@ -229,6 +231,13 @@ namespace
 		append_log_line("[host] " + message);
 	}
 
+	void host_patch_print(const std::string& message)
+	{
+		std::lock_guard _(g_output_mutex);
+		write_console_line(message);
+		append_log_line(message);
+	}
+
 	void write_console_line(const std::string& line)
 	{
 		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -260,7 +269,7 @@ namespace
 		{
 			const auto end = normalized.find('\n', start);
 			auto line = normalized.substr(start, end == std::string::npos ? std::string::npos : end - start);
-			if (!line.empty())
+			if (!line.empty() && !should_suppress_engine_line(line))
 			{
 				write_console_line("[engine] " + line);
 				append_log_line("[engine] " + line);
@@ -309,6 +318,32 @@ namespace
 		for (const auto* pattern : suppressed_patterns)
 		{
 			if (lowered.find(pattern) != std::string::npos)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	bool should_suppress_engine_line(const std::string& message)
+	{
+		auto lowered = message;
+		std::transform(lowered.begin(), lowered.end(), lowered.begin(), [](unsigned char c)
+		{
+			return static_cast<char>(std::tolower(c));
+		});
+
+		static const std::array<const char*, 3> suppressed_prefixes =
+		{
+			"adding channel:",
+			"hiding channel:",
+			"no channels added or hidden"
+		};
+
+		for (const auto* prefix : suppressed_prefixes)
+		{
+			if (lowered.rfind(prefix, 0) == 0)
 			{
 				return true;
 			}
@@ -538,95 +573,70 @@ namespace
 
 		try
 		{
-			host_print("applying early xlive/profile/render bypass patches");
-			host_print("patch detour 0x10240B30");
+		host_print("patching detours...");
+			host_patch_print("[patch - detour] patching 0x10240B30...");
 			g_xlive_patch_a.create(game::game_offset(0x10240B30), xlive_ret_one_stub);
-			host_print("patch detour 0x10240B30 done");
-			host_print("patch detour 0x10240A30");
+			host_patch_print("[patch - detour] patching 0x10240A30...");
 			g_xlive_patch_b.create(game::game_offset(0x10240A30), xlive_ret_one_stub);
-			host_print("patch detour 0x10240A30 done");
-			host_print("patch jump 0x1024D8E9 -> 0x1024D909");
-			utils::hook::jump(game::game_offset(0x1024D8E9), game::game_offset(0x1024D909));
-			host_print("patch jump 0x1024D8E9 done");
-			host_print("patch nop 0x102489A1");
-			utils::hook::nop(game::game_offset(0x102489A1), 5);
-			host_print("patch nop 0x102489A1 done");
-			host_print("patch detour 0x102C3280");
+			host_patch_print("[patch - detour] patching 0x102C3280...");
 			g_splash_patch.create(game::game_offset(0x102C3280), ret_success_stub);
-			host_print("patch detour 0x102C3280 done");
-			host_print("patch detour 0x10243EE0");
+			host_patch_print("[patch - detour] patching 0x10243EE0...");
 			g_xnaddr_patch.create(game::game_offset(0x10243EE0), xnaddr_success_stub);
-			host_print("patch detour 0x10243EE0 done");
-			host_print("patch detour 0x10244890");
+			host_patch_print("[patch - detour] patching 0x10244890...");
 			g_net_init_patch.create(game::game_offset(0x10244890), net_init_skip_stub);
-			host_print("patch detour 0x10244890 done");
-			host_print("patch detour 0x103BEC80");
+			host_patch_print("[patch - detour] patching 0x103BEC80...");
 			g_d3d_interface_patch.create(game::game_offset(0x103BEC80), d3d_interface_skip_stub);
-			host_print("patch detour 0x103BEC80 done");
-			host_print("patch detour 0x103BD850");
+			host_patch_print("[patch - detour] patching 0x103BD850...");
 			g_d3d_device_patch.create(game::game_offset(0x103BD850), d3d_device_skip_stub);
-			host_print("patch detour 0x103BD850 done");
-			host_print("patch detour 0x103BDB50");
+			host_patch_print("[patch - detour] patching 0x103BDB50...");
 			g_d3d_queries_patch.create(game::game_offset(0x103BDB50), d3d_queries_skip_stub);
-			host_print("patch detour 0x103BDB50 done");
-			host_print("patch detour 0x103BE750");
+			host_patch_print("[patch - detour] patching 0x103BE750...");
 			g_renderer_choice_patch.create(game::game_offset(0x103BE750), renderer_choice_skip_stub);
-			host_print("patch detour 0x103BE750 done");
-			host_print("patch detour 0x103BEFD0");
+			host_patch_print("[patch - detour] patching 0x103BEFD0...");
 			g_renderer_init_patch.create(game::game_offset(0x103BEFD0), renderer_init_skip_stub);
-			host_print("patch detour 0x103BEFD0 done");
-			host_print("patch detour 0x103BFF00");
+			host_patch_print("[patch - detour] patching 0x103BFF00...");
 			g_renderer_backend_begin_patch.create(game::game_offset(0x103BFF00), renderer_backend_skip_stub);
-			host_print("patch detour 0x103BFF00 done");
-			host_print("patch detour 0x103BF5C0");
+			host_patch_print("[patch - detour] patching 0x103BF5C0...");
 			g_renderer_backend_end_patch.create(game::game_offset(0x103BF5C0), renderer_backend_skip_stub);
-			host_print("patch detour 0x103BF5C0 done");
-			host_print("patch detour 0x103BF110");
+			host_patch_print("[patch - detour] patching 0x103BF110...");
 			g_material_smp_patch.create(game::game_offset(0x103BF110), material_smp_skip_stub);
-			host_print("patch detour 0x103BF110 done");
-			host_print("patch detour 0x104035F0");
+			host_patch_print("[patch - detour] patching 0x104035F0...");
 			g_sound_init_patch.create(game::game_offset(0x104035F0), sound_init_skip_stub);
-			host_print("patch detour 0x104035F0 done");
-			host_print("patch detour 0x10247160");
+			host_patch_print("[patch - detour] patching 0x10247160...");
 			g_session_start_patch.create(game::game_offset(0x10247160), session_start_skip_stub);
-			host_print("patch detour 0x10247160 done");
-			host_print("patch detour 0x1031E840");
+			host_patch_print("[patch - detour] patching 0x1031E840...");
 			g_client_disconnect_patch.create(game::game_offset(0x1031E840), client_disconnect_skip_stub);
-			host_print("patch detour 0x1031E840 done");
-			host_print("patch detour 0x102DA9B0");
+			host_patch_print("[patch - detour] patching 0x102DA9B0...");
 			g_localize_lookup_patch.create(game::game_offset(0x102DA9B0), localize_lookup_filter_stub);
-			host_print("patch detour 0x102DA9B0 done");
-			host_print("patch detour 0x103F5820");
+			host_patch_print("[patch - detour] patching 0x103F5820...");
 			g_exec_config_patch.create(game::game_offset(0x103F5820), exec_config_filter_stub);
-			host_print("patch detour 0x103F5820 done");
-			host_print("patch jump 0x103F7156 -> 0x103F7162");
+			host_patch_print("[patch - detour] patching 0x103F6400...");
+			g_engine_printf_hook.create(game::game_offset(0x103F6400), engine_printf_stub);
+			host_patch_print("[patch - detour] patching 0x103F77B0...");
+			g_com_error_hook.create(game::game_offset(0x103F77B0), com_error_stub);
+			host_patch_print("[patch - detour] patching 0x103E1CF0...");
+			g_db_load_xassets_hook.create(game::game_offset(0x103E1CF0), db_load_xassets_stub);
+			g_db_load_xassets_original = g_db_load_xassets_hook.get_original();
+			host_print("patching jumps...");
+			host_patch_print("[patch - jump] 0x1024D8E9 -> 0x1024D909");
+			utils::hook::jump(game::game_offset(0x1024D8E9), game::game_offset(0x1024D909));
+			host_patch_print("[patch - jump] 0x103F7156 -> 0x103F7162");
 			utils::hook::jump(game::game_offset(0x103F7156), game::game_offset(0x103F7162));
-			host_print("patch jump 0x103F7156 done");
-			host_print("patch jump 0x103F71B8 -> 0x103F721D");
+			host_patch_print("[patch - jump] 0x103F71B8 -> 0x103F721D");
 			utils::hook::jump(game::game_offset(0x103F71B8), game::game_offset(0x103F721D));
-			host_print("patch jump 0x103F71B8 done");
-			host_print("patch jump 0x103F9BC1 -> 0x103F9BD7");
+			host_patch_print("[patch - jump] 0x103F9BC1 -> 0x103F9BD7");
 			utils::hook::jump(game::game_offset(0x103F9BC1), game::game_offset(0x103F9BD7));
-			host_print("patch jump 0x103F9BC1 done");
-			host_print("patch jump 0x103F9B5A -> 0x103F9B85");
+			host_patch_print("[patch - jump] 0x103F9B5A -> 0x103F9B85");
 			utils::hook::jump(game::game_offset(0x103F9B5A), game::game_offset(0x103F9B85));
-			host_print("patch jump 0x103F9B5A done");
-			host_print("patch gfxConfig callsite 0x103F9A80");
+			host_print("patching nops...");
+			host_patch_print("[patch - nop] 0x102489A1 (5 bytes)");
+			utils::hook::nop(game::game_offset(0x102489A1), 5);
+			host_print("patching callsites...");
+			host_patch_print("[patch - callsite] 0x103F9A80");
 			utils::hook::set<std::uint8_t>(game::game_offset(0x103F9A80), 0xB0);
 			utils::hook::set<std::uint8_t>(game::game_offset(0x103F9A81), 0x01);
 			utils::hook::nop(game::game_offset(0x103F9A82), 15);
-			host_print("patch gfxConfig callsite 0x103F9A80 done");
-			host_print("patch detour 0x103F6400");
-			g_engine_printf_hook.create(game::game_offset(0x103F6400), engine_printf_stub);
-			host_print("patch detour 0x103F6400 done");
-			host_print("patch detour 0x103F77B0");
-			g_com_error_hook.create(game::game_offset(0x103F77B0), com_error_stub);
-			host_print("patch detour 0x103F77B0 done");
-			host_print("patch detour 0x103E1CF0");
-			g_db_load_xassets_hook.create(game::game_offset(0x103E1CF0), db_load_xassets_stub);
-			g_db_load_xassets_original = g_db_load_xassets_hook.get_original();
-			host_print("patch detour 0x103E1CF0 done");
-			host_print("early patches applied");
+			host_patch_print("[host - patch] all patches applied");
 		}
 		catch (const std::exception& error)
 		{
@@ -645,6 +655,8 @@ namespace
 
 		host_print("resolved startMainMP export");
 
+		g_bootstrap_zone_redirected = false;
+		g_bootstrap_zones_ready = false;
 		g_window_watch_kill = false;
 		g_window_hidden_logged = false;
 		g_window_watch_thread = std::thread(hide_xport_windows_loop);
@@ -680,17 +692,8 @@ namespace
 			return fail_and_wait("engine thread exited before runtime initialization (" + std::to_string(exit_code) + ")");
 		}
 
-		host_print("initializing runtime in-process");
-		if (!runtime::initialize(true))
-		{
-			g_window_watch_kill = true;
-			if (g_window_watch_thread.joinable())
-			{
-				g_window_watch_thread.join();
-			}
-			return fail_and_wait("runtime initialization failed");
-		}
-
+		host_print("waiting for ZoneTool-style bootstrap zones before runtime init");
+		auto bootstrap_wait_start = GetTickCount64();
 		while (!g_bootstrap_zones_ready.load())
 		{
 			const auto engine_wait = WaitForSingleObject(thread, 50);
@@ -699,10 +702,42 @@ namespace
 				DWORD exit_code = 0;
 				if (GetExitCodeThread(thread, &exit_code))
 				{
-					host_print("engine thread exited before bootstrap zones completed (" + std::to_string(exit_code) + ")");
+					g_window_watch_kill = true;
+					if (g_window_watch_thread.joinable())
+					{
+						g_window_watch_thread.join();
+					}
+					return fail_and_wait("engine thread exited before bootstrap zones completed (" + std::to_string(exit_code) + ")");
 				}
-				break;
+
+				g_window_watch_kill = true;
+				if (g_window_watch_thread.joinable())
+				{
+					g_window_watch_thread.join();
+				}
+				return fail_and_wait("engine thread exited before bootstrap zones completed");
 			}
+
+			if ((GetTickCount64() - bootstrap_wait_start) > 10000)
+			{
+				g_window_watch_kill = true;
+				if (g_window_watch_thread.joinable())
+				{
+					g_window_watch_thread.join();
+				}
+				return fail_and_wait("timed out waiting for bootstrap zones to load");
+			}
+		}
+
+		host_print("bootstrap zones loaded, initializing runtime in-process");
+		if (!runtime::initialize(true))
+		{
+			g_window_watch_kill = true;
+			if (g_window_watch_thread.joinable())
+			{
+				g_window_watch_thread.join();
+			}
+			return fail_and_wait("runtime initialization failed");
 		}
 
 		if (g_bootstrap_zones_ready.load())

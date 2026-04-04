@@ -3,6 +3,26 @@
 
 namespace
 {
+	void write_console_line(const std::string& line)
+	{
+		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
+		if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
+		{
+			DWORD mode = 0;
+			if (GetConsoleMode(handle, &mode))
+			{
+				const auto with_newline = line + "\r\n";
+				DWORD written = 0;
+				WriteConsoleA(handle, with_newline.data(), static_cast<DWORD>(with_newline.size()), &written, nullptr);
+				return;
+			}
+		}
+
+		std::fwrite(line.data(), 1, line.size(), stdout);
+		std::fwrite("\n", 1, 1, stdout);
+		std::fflush(stdout);
+	}
+
 	std::filesystem::path get_launcher_log_path()
 	{
 		char module_path[MAX_PATH]{};
@@ -42,6 +62,11 @@ namespace
 		DWORD bytes_written = 0;
 		WriteFile(handle, line.data(), static_cast<DWORD>(line.size()), &bytes_written, nullptr);
 	}
+
+	void print_component_console_progress(const char* phase, const std::string& component_name)
+	{
+		write_console_line(std::string("[runtime - ") + phase + "] " + component_name);
+	}
 }
 
 void component_loader::register_component(std::unique_ptr<component_interface>&& component_)
@@ -62,6 +87,7 @@ bool component_loader::post_start()
 		for (const auto& component_ : get_components())
 		{
 			log_component_message(std::string("component post_start begin: ") + typeid(*component_).name());
+			print_component_console_progress("post_start", typeid(*component_).name());
 			component_->post_start();
 			log_component_message(std::string("component post_start end: ") + typeid(*component_).name());
 		}
@@ -87,6 +113,7 @@ bool component_loader::post_load()
 		for (const auto& component_ : get_components())
 		{
 			log_component_message(std::string("component post_load begin: ") + typeid(*component_).name());
+			print_component_console_progress("post_load", typeid(*component_).name());
 			component_->post_load();
 			log_component_message(std::string("component post_load end: ") + typeid(*component_).name());
 		}
