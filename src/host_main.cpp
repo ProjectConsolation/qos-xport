@@ -472,21 +472,21 @@ namespace
 		return g_debugbreak_bootstrap && IsDebuggerPresent();
 	}
 
-	void wait_for_debugger_if_requested()
+	void wait_for_debugger_if_requested(const char* stage)
 	{
 		if (!g_debugbreak_bootstrap)
 		{
 			return;
 		}
 
-		write_console_line("[debug - wait] attach a debugger now");
-		append_log_line("[host] debug env waiting for debugger attach");
+		write_console_line(std::string("[debug - wait] attach a debugger now (") + stage + ")");
+		append_log_line(std::string("[host] debug env waiting for debugger attach (") + stage + ")");
 		while (!IsDebuggerPresent())
 		{
 			Sleep(100);
 		}
 
-		append_log_line("[host] debug env attached");
+		append_log_line(std::string("[host] debug env attached (") + stage + ")");
 	}
 
 	__declspec(naked) void db_load_xassets_stub()
@@ -716,6 +716,8 @@ namespace
 			return fail_and_wait("early patch stage failed with unknown exception");
 		}
 
+		wait_for_debugger_if_requested("pre-engine");
+
 		const auto start_main_mp = GetProcAddress(module, "startMainMP");
 		if (!start_main_mp)
 		{
@@ -809,7 +811,7 @@ namespace
 			return fail_and_wait("runtime initialization failed");
 		}
 
-		wait_for_debugger_if_requested();
+		wait_for_debugger_if_requested("post-runtime");
 
 		if (g_bootstrap_zones_ready.load())
 		{
