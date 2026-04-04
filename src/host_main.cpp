@@ -46,6 +46,7 @@ namespace
 	std::atomic_bool g_profile_config_skip_logged = false;
 	std::atomic_bool g_engine_error_seen = false;
 	std::atomic_bool g_init_popup_seen = false;
+	std::atomic_ulong g_module_load_exception_code = 0;
 	std::atomic_int g_fs_startup_count = 0;
 	bool g_debugbreak_bootstrap = false;
 	std::atomic_bool g_window_watch_kill = false;
@@ -78,11 +79,33 @@ namespace
 	void fs_readfile_filter_stub();
 	LONG WINAPI host_exception_filter(_EXCEPTION_POINTERS* exception_info);
 	void __cdecl init_popup_stub(char* message);
+	HMODULE load_jb_mp_module_guarded();
 	std::string hex_address(const std::uintptr_t address)
 	{
 		char buffer[16]{};
 		sprintf_s(buffer, "%08X", static_cast<unsigned int>(address));
 		return buffer;
+	}
+
+	int handle_module_load_exception(_EXCEPTION_POINTERS* exception_info)
+	{
+		g_module_load_exception_code = exception_info && exception_info->ExceptionRecord
+			? exception_info->ExceptionRecord->ExceptionCode
+			: 0;
+		return EXCEPTION_EXECUTE_HANDLER;
+	}
+
+	HMODULE load_jb_mp_module_guarded()
+	{
+		g_module_load_exception_code = 0;
+		__try
+		{
+			return LoadLibraryA("jb_mp_s.dll");
+		}
+		__except (handle_module_load_exception(GetExceptionInformation()))
+		{
+			return nullptr;
+		}
 	}
 	template <typename Stub>
 	void apply_detour(utils::hook::detour& detour, const std::uintptr_t address, Stub stub)
@@ -371,7 +394,7 @@ namespace
 	void host_print(const std::string& message)
 	{
 		std::lock_guard _(runtime::get_output_mutex());
-		write_console_line("[QoS-xport]: " + message);
+		write_console_line("[QoS-xport] " + message);
 		append_log_line("[host] " + message);
 	}
 
@@ -409,9 +432,36 @@ namespace
 			DWORD mode = 0;
 			if (GetConsoleMode(handle, &mode))
 			{
+				CONSOLE_SCREEN_BUFFER_INFO info{};
+				WORD original_attributes = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+				if (GetConsoleScreenBufferInfo(handle, &info))
+				{
+					original_attributes = info.wAttributes;
+				}
+
+				WORD color = original_attributes;
+				if (line.rfind("[engine:error]", 0) == 0 || line.rfind("[engine:init]", 0) == 0)
+				{
+					color = FOREGROUND_RED | FOREGROUND_INTENSITY;
+				}
+				else if (line.rfind("[debug - wait]", 0) == 0 || lower_copy(line).find("warning") != std::string::npos)
+				{
+					color = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+				}
+				else if (line.rfind("[QoS-xport] =========== initialization complete =============", 0) == 0)
+				{
+					color = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+				}
+				else if (line.rfind("[QoS-xport]", 0) == 0)
+				{
+					color = FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
+				}
+
 				const auto with_newline = line + "\r\n";
 				DWORD written = 0;
+				SetConsoleTextAttribute(handle, color);
 				WriteConsoleA(handle, with_newline.data(), static_cast<DWORD>(with_newline.size()), &written, nullptr);
+				SetConsoleTextAttribute(handle, original_attributes);
 				return;
 			}
 		}
@@ -892,18 +942,15 @@ namespace
 		host_print("========== qos-xport initializing ==========");
 		host_print("loading jb_mp_s.dll...");
 
-		HMODULE module = nullptr;
-		__try
-		{
-			module = LoadLibraryA("jb_mp_s.dll");
-		}
-		__except (handle_engine_thread_exception(GetExceptionInformation()))
-		{
-			return fail_and_wait("exception while loading jb_mp_s.dll");
-		}
+		const auto module = load_jb_mp_module_guarded();
 
 		if (!module)
 		{
+			if (g_module_load_exception_code.load() != 0)
+			{
+				return fail_and_wait("exception while loading jb_mp_s.dll (0x" + hex_address(g_module_load_exception_code.load()) + ")");
+			}
+
 			return fail_and_wait("failed to load jb_mp_s.dll (" + std::to_string(GetLastError()) + ")");
 		}
 		game::mp_dll = module;
