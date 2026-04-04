@@ -357,7 +357,11 @@ namespace
 				return false;
 			}
 
-			const auto zone_name = utils::string::to_lower(name);
+			auto zone_name = std::string(name);
+			std::transform(zone_name.begin(), zone_name.end(), zone_name.begin(), [](unsigned char c)
+			{
+				return static_cast<char>(std::tolower(c));
+			});
 			if (zone_name != "configuration_mp" && zone_name != "localized_configuration_mp")
 			{
 				return false;
