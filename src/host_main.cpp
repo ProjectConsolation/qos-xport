@@ -32,8 +32,6 @@ namespace
 	utils::hook::detour g_localize_lookup_patch;
 	utils::hook::detour g_engine_printf_hook;
 	utils::hook::detour g_com_error_hook;
-	utils::hook::detour g_db_load_xassets_hook;
-	void* g_db_load_xassets_original = nullptr;
 	std::atomic_bool g_bootstrap_zone_redirected = false;
 	std::atomic_bool g_bootstrap_zones_ready = false;
 	std::atomic_bool g_bootstrap_zone_load_started = false;
@@ -48,7 +46,6 @@ namespace
 	void write_console_line(const std::string& line);
 	void host_patch_print(const std::string& message);
 	bool should_suppress_engine_error(const std::string& message);
-	bool should_redirect_zone_load(game::qos::XZoneInfo* zone_info, int zone_count, int sync);
 	bool should_suppress_engine_line(const std::string& message);
 	std::string lower_copy(std::string value);
 	enum zone_trace_source
@@ -61,6 +58,7 @@ namespace
 	bool should_debugbreak_bootstrap();
 	void wait_for_debugger_if_requested();
 	std::string describe_zone_name(const char* name, bool trusted);
+	void perform_bootstrap_zone_load();
 	std::string hex_address(const std::uintptr_t address)
 	{
 		char buffer[16]{};
@@ -426,37 +424,6 @@ namespace
 		g_com_error_hook.invoke<void>(a1, a2, a3, const_cast<char*>("%s"), message.c_str());
 	}
 
-	bool should_redirect_zone_load(game::qos::XZoneInfo* zone_info, int zone_count, int)
-	{
-		if (!runtime::is_standalone_xport_mode() || !zone_info || zone_count <= 0)
-		{
-			return false;
-		}
-
-		for (int i = 0; i < zone_count; ++i)
-		{
-			const auto* name = zone_info[i].name;
-			if (!name)
-			{
-				return false;
-			}
-
-			const auto zone_name = lower_copy(name);
-			if (zone_name != "configuration_mp" && zone_name != "localized_configuration_mp")
-			{
-				return false;
-			}
-		}
-
-		if (!g_bootstrap_zone_redirected.exchange(true))
-		{
-			host_print("redirecting configuration_mp zone bootstrap to ZoneTool-style default zones");
-		}
-
-	g_bootstrap_zones_ready = true;
-		return true;
-	}
-
 	std::string describe_zone_name(const char* name, const bool trusted)
 	{
 		if (!name)
@@ -511,6 +478,22 @@ namespace
 		host_print(message);
 	}
 
+	void perform_bootstrap_zone_load()
+	{
+		if (!runtime::is_standalone_xport_mode())
+		{
+			return;
+		}
+
+		if (!g_bootstrap_zone_redirected.exchange(true))
+		{
+			host_print("loading bootstrap zones");
+			log_zone_load_request(zone_trace_manual, g_bootstrap_zones, static_cast<int>(std::size(g_bootstrap_zones)), 0);
+			game::DB_LoadXAssets(g_bootstrap_zones, static_cast<int>(std::size(g_bootstrap_zones)), false);
+			g_bootstrap_zones_ready = true;
+		}
+	}
+
 	bool should_debugbreak_bootstrap()
 	{
 		return g_debugbreak_bootstrap && IsDebuggerPresent();
@@ -533,54 +516,20 @@ namespace
 		append_log_line(std::string("[host] debug env attached (") + stage + ")");
 	}
 
-	__declspec(naked) void db_load_xassets_stub()
+	__declspec(naked) void bootstrap_zone_load_stub()
 	{
 		__asm
 		{
-			push ebp
-			mov ebp, esp
-			mov edx, eax
-			pushad
-			push dword ptr [ebp + 12]
-			push dword ptr [ebp + 8]
-			push edx
-			push zone_trace_original
-			call log_zone_load_request
-			add esp, 16
-			push dword ptr [ebp + 12]
-			push dword ptr [ebp + 8]
-			push edx
-			call should_redirect_zone_load
-			add esp, 12
-			mov bl, al
-			popad
-			test bl, bl
-			jz continue_original
 			call should_debugbreak_bootstrap
 			test al, al
 			jz no_break
 			int 3
 		no_break:
 			pushad
-			push 0
-			push 5
-			push offset g_bootstrap_zones
-			push zone_trace_redirect
-			call log_zone_load_request
-			add esp, 16
+			call perform_bootstrap_zone_load
 			popad
-			mov eax, offset g_bootstrap_zones
-			push 0
-			push 5
-			call dword ptr [g_db_load_xassets_original]
-			add esp, 8
-			mov esp, ebp
-			pop ebp
+			xor eax, eax
 			ret
-		continue_original:
-			mov esp, ebp
-			pop ebp
-			jmp dword ptr [g_db_load_xassets_original]
 		}
 	}
 
@@ -734,8 +683,6 @@ namespace
 			apply_detour(g_exec_config_patch, 0x103F5820, exec_config_filter_stub);
 			apply_detour(g_engine_printf_hook, 0x103F6400, engine_printf_stub);
 			apply_detour(g_com_error_hook, 0x103F77B0, com_error_stub);
-			apply_detour(g_db_load_xassets_hook, 0x103E1CF0, db_load_xassets_stub);
-			g_db_load_xassets_original = g_db_load_xassets_hook.get_original();
 
 			host_print("patching jumps...");
 			apply_jump(0x1024D8E9, 0x1024D909);
@@ -749,6 +696,12 @@ namespace
 
 			host_print("patching callsites...");
 			apply_gfxconfig_callsite_patch();
+			host_patch_print("[patch - call] 0x103F9A71");
+			utils::hook::call(game::game_offset(0x103F9A71), bootstrap_zone_load_stub);
+			host_patch_print("[patch - call] 0x103F7665");
+			utils::hook::call(game::game_offset(0x103F7665), bootstrap_zone_load_stub);
+			host_patch_print("[patch - call] 0x103209F8");
+			utils::hook::call(game::game_offset(0x103209F8), bootstrap_zone_load_stub);
 			host_patch_print("[host - patch] all patches applied");
 			host_print("file load refs: FS_Startup=0x10272D80 ExecConfig=0x103F5820 Scr_ReadFile_FastFile=0x1022DF13 DB_LoadXAssets=0x103E1CF0");
 		}
@@ -820,7 +773,6 @@ namespace
 				log_zone_load_request(zone_trace_manual, g_bootstrap_zones, static_cast<int>(std::size(g_bootstrap_zones)), 0);
 				game::DB_LoadXAssets(g_bootstrap_zones, static_cast<int>(std::size(g_bootstrap_zones)), false);
 				g_bootstrap_zones_ready = true;
-				break;
 			}
 
 			const auto engine_wait = WaitForSingleObject(thread, 50);
@@ -847,12 +799,9 @@ namespace
 
 			if ((GetTickCount64() - bootstrap_wait_start) > 10000)
 			{
-				g_window_watch_kill = true;
-				if (g_window_watch_thread.joinable())
-				{
-					g_window_watch_thread.join();
-				}
-				return fail_and_wait("timed out waiting for bootstrap zones to load");
+				host_print("bootstrap zones not confirmed yet; continuing with manual bootstrap state");
+				g_bootstrap_zones_ready = true;
+				break;
 			}
 		}
 
