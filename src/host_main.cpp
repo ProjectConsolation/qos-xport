@@ -696,12 +696,12 @@ namespace
 
 			host_print("patching callsites...");
 			apply_gfxconfig_callsite_patch();
-			host_patch_print("[patch - call] 0x103F9A71");
-			utils::hook::call(game::game_offset(0x103F9A71), bootstrap_zone_load_stub);
-			host_patch_print("[patch - call] 0x103F7665");
-			utils::hook::call(game::game_offset(0x103F7665), bootstrap_zone_load_stub);
-			host_patch_print("[patch - call] 0x103209F8");
-			utils::hook::call(game::game_offset(0x103209F8), bootstrap_zone_load_stub);
+			host_patch_print("[patch - nop] 0x103F9A71 (5 bytes)");
+			utils::hook::nop(game::game_offset(0x103F9A71), 5);
+			host_patch_print("[patch - nop] 0x103F7665 (5 bytes)");
+			utils::hook::nop(game::game_offset(0x103F7665), 5);
+			host_patch_print("[patch - nop] 0x103209F8 (5 bytes)");
+			utils::hook::nop(game::game_offset(0x103209F8), 5);
 			host_patch_print("[host - patch] all patches applied");
 			host_print("file load refs: FS_Startup=0x10272D80 ExecConfig=0x103F5820 Scr_ReadFile_FastFile=0x1022DF13 DB_LoadXAssets=0x103E1CF0");
 		}
