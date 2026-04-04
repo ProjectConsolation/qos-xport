@@ -2,6 +2,13 @@
 
 namespace command
 {
+	struct help_entry
+	{
+		std::string name;
+		std::string description;
+		std::string example;
+	};
+
 	class params
 	{
 	public:
@@ -24,6 +31,8 @@ namespace command
 	void add_raw(const char* name, void (*callback)());
 	void add(const char* name, const std::function<void(const params&)>& callback);
 	void add(const char* name, const std::function<void()>& callback);
+	void set_help(const char* name, const std::string& description, const std::string& example);
 	void execute(std::string command);
 	bool execute_local(const std::string& command_line);
+	std::vector<help_entry> get_help_entries();
 }

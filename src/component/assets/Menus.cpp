@@ -1043,6 +1043,7 @@ namespace menus
 
 					console::info("dumped '%s'\n", name);
 				});
+				command::set_help("dumpmenu", "Dump one menu asset to a .menu file.", "dumpmenu main_text");
 
 				command::add("dumpmenulist", [](const command::params& params)
 					{
@@ -1071,6 +1072,7 @@ namespace menus
 
 						console::info("dumped '%s'\n", name);
 					});
+				command::set_help("dumpmenulist", "Dump every menu referenced by a menulist asset.", "dumpmenulist ui_mp");
 			}, scheduler::main);
 		}
 

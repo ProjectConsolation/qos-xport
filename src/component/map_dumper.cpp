@@ -225,6 +225,7 @@ namespace map_dumper
 					console::info("map '%s' successfully exported.\n", name.data());
 				});
 #endif
+				command::set_help("dumpmap", "Load a map and export its supported world assets and rawfiles.", "dumpmap mp_backlot");
 			}, scheduler::main);
 		}
 	};

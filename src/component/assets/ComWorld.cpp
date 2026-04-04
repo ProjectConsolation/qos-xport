@@ -77,6 +77,7 @@ namespace comworld
 
 					console::info("dumped '%s' for IW4\n", name);
 				});
+				command::set_help("dumpcomworld", "Dump a loaded ComWorld asset.", "dumpcomworld maps/mp_backlot.d3dbsp");
 			}, scheduler::main);
 		}
 

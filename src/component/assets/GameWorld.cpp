@@ -60,6 +60,7 @@ namespace gameworld
 
 					console::info("dumped '%s' for IW4\n", name);
 				});
+				command::set_help("dumpgameworld", "Dump a loaded multiplayer GameWorld asset.", "dumpgameworld maps/mp_backlot.d3dbsp");
 			}, scheduler::main);
 		}
 

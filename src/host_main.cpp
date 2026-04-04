@@ -540,8 +540,13 @@ namespace
 			return fail_and_wait("runtime initialization failed");
 		}
 
-		host_print("runtime initialized successfully");
-		host_print("enter commands, or type 'quit' to exit");
+		write_console_line("");
+		write_console_line("");
+		write_console_line("");
+		write_console_line("[QoS-xport: init] =========== initialization complete =============");
+		write_console_line("[QoS-xport] type 'help' for a list of commands, or 'quit' to exit");
+		append_log_line("[host] initialization complete");
+		append_log_line("[host] type 'help' for a list of commands, or 'quit' to exit");
 
 		std::string line;
 		while (true)

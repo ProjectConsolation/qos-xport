@@ -388,7 +388,9 @@ namespace clipmap
 				};
 
 				command::add("dumpclipmap", dump_command);
+				command::set_help("dumpclipmap", "Dump a loaded multiplayer clipmap and convert it to IW4 format.", "dumpclipmap maps/mp_backlot.d3dbsp");
 				command::add("dumpclipmap_t", dump_command);
+				command::set_help("dumpclipmap_t", "Alias for dumpclipmap.", "dumpclipmap_t maps/mp_backlot.d3dbsp");
 			}, scheduler::main);
 		}
 

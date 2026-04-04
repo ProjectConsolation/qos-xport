@@ -289,6 +289,7 @@ namespace xmodel
 
 					console::info("dumped '%s' for IW4\n", name);
 				});
+				command::set_help("dumpxmodel", "Dump a loaded xmodel asset.", "dumpxmodel weapon_ak47_viewmodel");
 			}, scheduler::main);
 		}
 

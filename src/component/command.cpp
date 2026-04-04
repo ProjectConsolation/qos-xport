@@ -15,6 +15,7 @@ namespace command
 		static utils::memory::allocator cmd_allocator;
 
 		std::unordered_map<std::string, std::function<void(params&)>> handlers;
+		std::unordered_map<std::string, help_entry> help_entries;
 		thread_local bool local_dispatch = false;
 		thread_local std::vector<std::string> local_args;
 
@@ -110,6 +111,17 @@ namespace command
 		});
 	}
 
+	void set_help(const char* name, const std::string& description, const std::string& example)
+	{
+		const auto command = utils::string::to_lower(name);
+		help_entries[command] = help_entry
+		{
+			name,
+			description,
+			example
+		};
+	}
+
 	void execute(std::string command)
 	{
 		command += "\n";
@@ -173,6 +185,24 @@ namespace command
 		return true;
 	}
 
+	std::vector<help_entry> get_help_entries()
+	{
+		std::vector<help_entry> entries;
+		entries.reserve(help_entries.size());
+
+		for (const auto& [_, entry] : help_entries)
+		{
+			entries.push_back(entry);
+		}
+
+		std::sort(entries.begin(), entries.end(), [](const help_entry& a, const help_entry& b)
+		{
+			return utils::string::to_lower(a.name) < utils::string::to_lower(b.name);
+		});
+
+		return entries;
+	}
+
 	class component final : public component_interface
 	{
 	public:
@@ -180,10 +210,31 @@ namespace command
 		{
 			scheduler::once([&]()
 			{
+				add("help", []()
+				{
+					const auto entries = get_help_entries();
+					printf("available commands:\n");
+
+					for (const auto& entry : entries)
+					{
+						printf(" - %s\n", entry.name.c_str());
+						if (!entry.description.empty())
+						{
+							printf("   %s\n", entry.description.c_str());
+						}
+						if (!entry.example.empty())
+						{
+							printf("   example: %s\n", entry.example.c_str());
+						}
+					}
+				});
+				set_help("help", "List available standalone xport commands.", "help");
+
 				add("hello", []()
 				{
 					printf("hello from qos-exp!\n");
 				});
+				set_help("hello", "Test the standalone command shell.", "hello");
 			}, scheduler::main);
 		}
 

@@ -568,6 +568,7 @@ namespace gfxworld
 
 					console::info("dumped '%s' for IW4\n", name);
 				});
+				command::set_help("dumpgfxworld", "Dump a loaded GfxWorld asset.", "dumpgfxworld maps/mp_backlot.d3dbsp");
 			}, scheduler::main);
 		}
 

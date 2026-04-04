@@ -323,6 +323,7 @@ namespace assethandler
 						}
 					}
 				});
+				command::set_help("listassettypes", "List asset types that currently have working export converters.", "listassettypes");
 
 				command::add("dumpasset", [](const command::params& params)
 				{
@@ -354,6 +355,7 @@ namespace assethandler
 
 					console::info("dumped %s '%s'\n", type_to_string(*type), name.data());
 				});
+				command::set_help("dumpasset", "Dump one loaded asset by QoS type and name.", "dumpasset material weapon_ak47");
 
 				command::add("dumpallassets", [](const command::params& params)
 				{
@@ -380,6 +382,7 @@ namespace assethandler
 					const auto dumped = dump_all_assets_of_type(*type, filter);
 					console::info("dumped %zu %s asset(s)\n", dumped, type_to_string(*type));
 				});
+				command::set_help("dumpallassets", "Dump every loaded asset of a given type, optionally filtered by name.", "dumpallassets material compass_");
 			}, scheduler::main);
 		}
 
