@@ -544,8 +544,32 @@ namespace
 		host_print("enter commands, or type 'quit' to exit");
 
 		std::string line;
-		while (std::getline(std::cin, line))
+		while (true)
 		{
+			const auto engine_wait = WaitForSingleObject(thread, 0);
+			if (engine_wait == WAIT_OBJECT_0)
+			{
+				DWORD exit_code = 0;
+				if (GetExitCodeThread(thread, &exit_code))
+				{
+					host_print("engine thread exited with code " + std::to_string(exit_code));
+				}
+				break;
+			}
+
+			if (!std::getline(std::cin, line))
+			{
+				if (std::cin.eof() || std::cin.fail())
+				{
+					std::cin.clear();
+					Sleep(50);
+					continue;
+				}
+
+				host_print("stdin closed unexpectedly");
+				break;
+			}
+
 			if (line == "quit" || line == "exit")
 			{
 				break;
@@ -569,12 +593,6 @@ namespace
 			g_window_watch_thread.join();
 		}
 		WaitForSingleObject(thread, 1000);
-
-		DWORD exit_code = 0;
-		if (GetExitCodeThread(thread, &exit_code))
-		{
-			host_print("engine thread exited with code " + std::to_string(exit_code));
-		}
 
 		return 0;
 	}
