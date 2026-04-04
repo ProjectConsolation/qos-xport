@@ -2,6 +2,7 @@
 #include "loader/component_loader.hpp"
 
 #include "scheduler.hpp"
+#include "../runtime.hpp"
 #include "game/game.hpp"
 
 #include <utils/hook.hpp>
@@ -151,6 +152,14 @@ namespace scheduler
 	void once(const std::function<void()>& callback, const pipeline type,
 	          const std::chrono::milliseconds delay)
 	{
+		if (runtime::is_standalone_xport_mode()
+			&& delay <= 0ms
+			&& (type == pipeline::main || type == pipeline::renderer))
+		{
+			callback();
+			return;
+		}
+
 		schedule([callback]()
 		{
 			callback();
@@ -175,6 +184,11 @@ namespace scheduler
 
 		void post_load() override
 		{
+			if (runtime::is_standalone_xport_mode())
+			{
+				return;
+			}
+
 			//utils::hook::call(0x4FD7AB, scheduler::server_frame_stub);
 			//r_end_frame_hook.create(0x68A2AC, scheduler::r_end_frame_stub);
 			main_frame_hook.create(game::game_offset(0x103F7470), main_frame_stub); // may be wrong?
