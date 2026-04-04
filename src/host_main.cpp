@@ -36,6 +36,8 @@ namespace
 	void* g_db_load_xassets_original = nullptr;
 	std::atomic_bool g_bootstrap_zone_redirected = false;
 	std::atomic_bool g_bootstrap_zones_ready = false;
+	std::atomic_bool g_bootstrap_zone_load_started = false;
+	std::atomic_int g_fs_startup_count = 0;
 	bool g_debugbreak_bootstrap = false;
 	std::atomic_bool g_window_watch_kill = false;
 	std::atomic_bool g_window_hidden_logged = false;
@@ -315,6 +317,11 @@ namespace
 			auto line = normalized.substr(start, end == std::string::npos ? std::string::npos : end - start);
 			if (!line.empty() && !should_suppress_engine_line(line))
 			{
+				if (line == "----- FS_Startup -----")
+				{
+					++g_fs_startup_count;
+				}
+
 				write_console_line("[engine] " + line);
 				append_log_line("[engine] " + line);
 			}
@@ -728,6 +735,8 @@ namespace
 
 		g_bootstrap_zone_redirected = false;
 		g_bootstrap_zones_ready = false;
+		g_bootstrap_zone_load_started = false;
+		g_fs_startup_count = 0;
 		g_window_watch_kill = false;
 		g_window_hidden_logged = false;
 		g_window_watch_thread = std::thread(hide_xport_windows_loop);
@@ -767,6 +776,15 @@ namespace
 		auto bootstrap_wait_start = GetTickCount64();
 		while (!g_bootstrap_zones_ready.load())
 		{
+			if (!g_bootstrap_zone_load_started.exchange(true) && g_fs_startup_count.load() > 0)
+			{
+				host_print("FS startup reached; loading ZoneTool-style bootstrap zones");
+				log_zone_load_request("manual", g_bootstrap_zones, static_cast<int>(std::size(g_bootstrap_zones)), 0);
+				game::DB_LoadXAssets(g_bootstrap_zones, static_cast<int>(std::size(g_bootstrap_zones)), false);
+				g_bootstrap_zones_ready = true;
+				break;
+			}
+
 			const auto engine_wait = WaitForSingleObject(thread, 50);
 			if (engine_wait == WAIT_OBJECT_0)
 			{
