@@ -32,6 +32,7 @@ namespace
 	utils::hook::detour g_session_start_patch;
 	utils::hook::detour g_client_disconnect_patch;
 	utils::hook::detour g_exec_config_patch;
+	utils::hook::detour g_profile_config_patch;
 	utils::hook::detour g_localize_lookup_patch;
 	utils::hook::detour g_engine_printf_hook;
 	utils::hook::detour g_com_error_hook;
@@ -41,6 +42,7 @@ namespace
 	std::atomic_bool g_bootstrap_zones_ready = false;
 	std::atomic_bool g_bootstrap_zone_load_started = false;
 	std::atomic_bool g_debug_wait_consumed = false;
+	std::atomic_bool g_profile_config_skip_logged = false;
 	std::atomic_int g_fs_startup_count = 0;
 	bool g_debugbreak_bootstrap = false;
 	std::atomic_bool g_window_watch_kill = false;
@@ -69,6 +71,7 @@ namespace
 	int __cdecl fs_startup_host_stub();
 	int __cdecl fs_readfile_filter_impl(char* name, void** out_buffer, int flags);
 	int __cdecl invoke_original_fs_readfile(char* name, void** out_buffer, int flags);
+	int __cdecl profile_config_skip_stub(int controller, const char* source);
 	void fs_readfile_filter_stub();
 	LONG WINAPI host_exception_filter(_EXCEPTION_POINTERS* exception_info);
 	std::string hex_address(const std::uintptr_t address)
@@ -229,6 +232,24 @@ namespace
 		return g_exec_config_patch.invoke<char>(name, a2, a3, a4);
 	}
 
+	int __cdecl profile_config_skip_stub(int controller, const char* source)
+	{
+		(void)controller;
+		(void)source;
+
+		if (runtime::is_standalone_xport_mode())
+		{
+			if (!g_profile_config_skip_logged.exchange(true))
+			{
+				host_print("skipping config_mp.cfg bootstrap in standalone xport mode");
+			}
+
+			return 0;
+		}
+
+		return g_profile_config_patch.invoke<int>(controller, source);
+	}
+
 	int __cdecl invoke_original_fs_readfile(char* name, void** out_buffer, int flags)
 	{
 		auto* original = g_fs_readfile_patch.get_original();
@@ -361,7 +382,7 @@ namespace
 
 	std::string make_host_section_line(const std::string& label, const std::string& message)
 	{
-		constexpr size_t target_prefix_width = 16;
+		constexpr size_t target_prefix_width = 19;
 		auto prefix = label;
 		if (prefix.size() < target_prefix_width)
 		{
@@ -547,7 +568,7 @@ namespace
 		}
 
 		const bool trusted_names = (source == zone_trace_manual);
-		host_section_print(make_host_section_line("[host - zone count]", source_name + " zone_count = " + std::to_string(zone_count)));
+		host_section_print(make_host_section_line("[host - zone count]", std::string(source_name) + " zone_count = " + std::to_string(zone_count)));
 		host_section_print(make_host_section_line("[host - zone sync]", "sync = " + std::to_string(sync ? 1 : 0)));
 		host_section_print(make_host_section_line("[host - zones]", "======================="));
 		for (int i = 0; i < zone_count; ++i)
@@ -877,6 +898,7 @@ namespace
 			apply_detour(g_client_disconnect_patch, 0x1031E840, client_disconnect_skip_stub);
 			apply_detour(g_localize_lookup_patch, 0x102DA9B0, localize_lookup_filter_stub);
 			apply_detour(g_exec_config_patch, 0x103F5820, exec_config_filter_stub);
+			apply_detour(g_profile_config_patch, 0x103F1A30, profile_config_skip_stub);
 			apply_detour(g_fs_readfile_patch, 0x10271E40, fs_readfile_filter_stub);
 			apply_detour(g_engine_printf_hook, 0x103F6400, engine_printf_stub);
 			apply_detour(g_com_error_hook, 0x103F77B0, com_error_stub);
@@ -887,7 +909,7 @@ namespace
 			apply_jump(0x1024D8E9, 0x1024D909);
 			apply_jump(0x103F7156, 0x103F7162);
 			apply_jump(0x103F7162, 0x103F71A7);
-			apply_jump(0x103F71B8, 0x103F721D);
+			apply_jump(0x103F71A7, 0x103F721D);
 			apply_jump(0x103F9BC1, 0x103F9BD7);
 			apply_jump(0x103F9B5A, 0x103F9B85);
 
@@ -1015,6 +1037,32 @@ namespace
 		}
 
 		wait_for_debugger_if_requested("post-runtime");
+
+		const auto ready_wait_start = GetTickCount64();
+		while ((GetTickCount64() - ready_wait_start) < 1000)
+		{
+			const auto engine_wait = WaitForSingleObject(thread, 50);
+			if (engine_wait == WAIT_OBJECT_0)
+			{
+				DWORD exit_code = 0;
+				if (GetExitCodeThread(thread, &exit_code))
+				{
+					g_window_watch_kill = true;
+					if (g_window_watch_thread.joinable())
+					{
+						g_window_watch_thread.join();
+					}
+					return fail_and_wait("engine thread exited before initialization completed (" + std::to_string(exit_code) + ")");
+				}
+
+				g_window_watch_kill = true;
+				if (g_window_watch_thread.joinable())
+				{
+					g_window_watch_thread.join();
+				}
+				return fail_and_wait("engine thread exited before initialization completed");
+			}
+		}
 
 		if (g_bootstrap_zones_ready.load())
 		{
