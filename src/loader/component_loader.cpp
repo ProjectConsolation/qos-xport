@@ -116,7 +116,6 @@ bool component_loader::post_load()
 		for (const auto& component_ : get_components())
 		{
 			log_component_message(std::string("component post_load begin: ") + typeid(*component_).name());
-			print_component_console_progress("post_load", typeid(*component_).name());
 			component_->post_load();
 			log_component_message(std::string("component post_load end: ") + typeid(*component_).name());
 		}

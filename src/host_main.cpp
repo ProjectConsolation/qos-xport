@@ -52,8 +52,8 @@ namespace
 	void log_zone_load_request(const char* source, game::qos::XZoneInfo* zone_info, int zone_count, int sync);
 	bool should_debugbreak_bootstrap();
 	void wait_for_debugger_if_requested();
-	const char* g_zone_trace_original = "original";
-	const char* g_zone_trace_redirect = "redirect";
+	const char g_zone_trace_original[] = "original";
+	const char g_zone_trace_redirect[] = "redirect";
 	std::string hex_address(const std::uintptr_t address)
 	{
 		char buffer[16]{};
@@ -479,13 +479,14 @@ namespace
 			return;
 		}
 
-		host_print("debug env enabled; waiting for debugger to attach...");
+		write_console_line("[debug - wait] attach a debugger now");
+		append_log_line("[host] debug env waiting for debugger attach");
 		while (!IsDebuggerPresent())
 		{
 			Sleep(100);
 		}
 
-		host_print("debugger attached");
+		append_log_line("[host] debug env attached");
 	}
 
 	__declspec(naked) void db_load_xassets_stub()
@@ -499,7 +500,7 @@ namespace
 			push dword ptr [ebp + 12]
 			push dword ptr [ebp + 8]
 			push edx
-			push dword ptr [g_zone_trace_original]
+			push offset g_zone_trace_original
 			call log_zone_load_request
 			add esp, 16
 			push dword ptr [ebp + 12]
@@ -520,7 +521,7 @@ namespace
 			push 0
 			push 5
 			push offset g_bootstrap_zones
-			push dword ptr [g_zone_trace_redirect]
+			push offset g_zone_trace_redirect
 			call log_zone_load_request
 			add esp, 16
 			popad
@@ -665,7 +666,6 @@ namespace
 
 		host_print("loaded jb_mp_s.dll");
 		runtime::set_standalone_xport_mode(true);
-		wait_for_debugger_if_requested();
 
 		try
 		{
@@ -808,6 +808,8 @@ namespace
 			}
 			return fail_and_wait("runtime initialization failed");
 		}
+
+		wait_for_debugger_if_requested();
 
 		if (g_bootstrap_zones_ready.load())
 		{
