@@ -31,6 +31,7 @@ namespace
 	utils::hook::detour g_exec_config_patch;
 	utils::hook::detour g_localize_lookup_patch;
 	utils::hook::detour g_engine_printf_hook;
+	utils::hook::detour g_com_error_hook;
 	std::mutex g_output_mutex;
 	std::atomic_bool g_window_watch_kill = false;
 	std::atomic_bool g_window_hidden_logged = false;
@@ -265,6 +266,23 @@ namespace
 		engine_print(message);
 	}
 
+	void com_error_stub(int a1, int a2, int a3, char* format, ...)
+	{
+		va_list ap;
+		va_start(ap, format);
+		const auto message = format_message(&ap, format);
+		va_end(ap);
+
+		if (!message.empty())
+		{
+			std::lock_guard _(g_output_mutex);
+			write_console_line("[engine:error] " + message);
+			append_log_line("[engine:error] " + message);
+		}
+
+		g_com_error_hook.invoke<void>(a1, a2, a3, const_cast<char*>("%s"), message.c_str());
+	}
+
 	void __cdecl host_terminate_handler()
 	{
 		append_log_line("[host] CRT terminate handler invoked");
@@ -475,6 +493,9 @@ namespace
 			host_print("patch detour 0x103F6400");
 			g_engine_printf_hook.create(game::game_offset(0x103F6400), engine_printf_stub);
 			host_print("patch detour 0x103F6400 done");
+			host_print("patch detour 0x103F77B0");
+			g_com_error_hook.create(game::game_offset(0x103F77B0), com_error_stub);
+			host_print("patch detour 0x103F77B0 done");
 			host_print("early patches applied");
 		}
 		catch (const std::exception& error)

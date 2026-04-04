@@ -5,6 +5,7 @@
 namespace game
 {
 	WEAK symbol<void(int channel, const char* fmt, ...)> Com_Printf{ 0x103F6400 };
+	WEAK symbol<void(int a1, int a2, int a3, char* format, ...)> Com_Error{ 0x103F77B0 };
 
 	WEAK symbol<qos::XAssetHeader(qos::XAssetType type, const char* name)> DB_FindXAssetHeader{ 0x103E2260 };
 	WEAK symbol<qos::XAssetHeader(qos::XAssetType type, const char* name, int create_default)> DB_FindXAssetHeader_Internal{ 0x103E1EE0 };
