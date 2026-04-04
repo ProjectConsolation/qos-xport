@@ -714,6 +714,23 @@ namespace
 			const auto code = exception_info->ExceptionRecord->ExceptionCode;
 			const auto address = reinterpret_cast<std::uintptr_t>(exception_info->ExceptionRecord->ExceptionAddress);
 			append_log_line("[host] engine thread exception code=0x" + hex_address(code) + " address=0x" + hex_address(address));
+
+			if (exception_info->ContextRecord)
+			{
+				const auto* ctx = exception_info->ContextRecord;
+				append_log_line(
+					"[host] engine thread context "
+					"EAX=0x" + hex_address(ctx->Eax) +
+					" EBX=0x" + hex_address(ctx->Ebx) +
+					" ECX=0x" + hex_address(ctx->Ecx) +
+					" EDX=0x" + hex_address(ctx->Edx) +
+					" ESI=0x" + hex_address(ctx->Esi) +
+					" EDI=0x" + hex_address(ctx->Edi) +
+					" EBP=0x" + hex_address(ctx->Ebp) +
+					" ESP=0x" + hex_address(ctx->Esp) +
+					" EIP=0x" + hex_address(ctx->Eip)
+				);
+			}
 		}
 		else
 		{
