@@ -4,6 +4,7 @@
 #include "command.hpp"
 #include "console.hpp"
 #include "filesystem.hpp"
+#include "../runtime.hpp"
 
 #include "game/game.hpp"
 
@@ -205,6 +206,20 @@ namespace filesystem
 	public:
 		void post_load() override
 		{
+			if (runtime::is_standalone_xport_mode())
+			{
+				initialized = true;
+
+				filesystem::register_path(L".");
+				filesystem::register_path(L"qos-exp");
+				filesystem::register_path(L"devraw_shared");
+				filesystem::register_path(L"devraw");
+				filesystem::register_path(L"raw_shared");
+				filesystem::register_path(L"raw");
+				filesystem::register_path(L"main");
+				return;
+			}
+
 			fs_startup_hook.create(game::game_offset(0x10272D80), fs_startup_stub);
 
 			utils::hook::jump(game::game_offset(0x10274AA0), sys_default_install_path_stub);
