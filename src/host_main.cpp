@@ -49,22 +49,28 @@ namespace
 	bool should_redirect_zone_load(game::qos::XZoneInfo* zone_info, int zone_count, int sync);
 	bool should_suppress_engine_line(const std::string& message);
 	std::string lower_copy(std::string value);
+	std::string hex_address(const std::uintptr_t address)
+	{
+		char buffer[16]{};
+		sprintf_s(buffer, "%08X", static_cast<unsigned int>(address));
+		return buffer;
+	}
 	template <typename Stub>
 	void apply_detour(utils::hook::detour& detour, const std::uintptr_t address, Stub stub)
 	{
-		host_patch_print("[patch - detour] patching 0x" + utils::string::va("%08X", address) + "...");
+		host_patch_print("[patch - detour] patching 0x" + hex_address(address) + "...");
 		detour.create(game::game_offset(static_cast<unsigned int>(address)), stub);
 	}
 
 	void apply_jump(const std::uintptr_t from, const std::uintptr_t to)
 	{
-		host_patch_print("[patch - jump] 0x" + utils::string::va("%08X", from) + " -> 0x" + utils::string::va("%08X", to));
+		host_patch_print("[patch - jump] 0x" + hex_address(from) + " -> 0x" + hex_address(to));
 		utils::hook::jump(game::game_offset(static_cast<unsigned int>(from)), game::game_offset(static_cast<unsigned int>(to)));
 	}
 
 	void apply_nop(const std::uintptr_t address, const size_t size)
 	{
-		host_patch_print("[patch - nop] 0x" + utils::string::va("%08X", address) + " (" + std::to_string(size) + " bytes)");
+		host_patch_print("[patch - nop] 0x" + hex_address(address) + " (" + std::to_string(size) + " bytes)");
 		utils::hook::nop(game::game_offset(static_cast<unsigned int>(address)), size);
 	}
 
@@ -212,7 +218,7 @@ namespace
 		auto base = std::filesystem::path(path).parent_path() / "qos-xport";
 		std::error_code ec;
 		std::filesystem::create_directories(base, ec);
-		return base / "launcher.log";
+		return base / "qos-xport.log";
 	}
 
 	void append_log_line(const std::string& line)
@@ -581,7 +587,7 @@ namespace
 		set_terminate(host_terminate_handler);
 		_set_invalid_parameter_handler(host_invalid_parameter_handler);
 
-		host_print("========== standalone host start ==========");
+		host_print("========== qos-xport initializing ==========");
 
 		const auto module = LoadLibraryA("jb_mp_s.dll");
 		if (!module)

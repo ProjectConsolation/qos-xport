@@ -30,7 +30,7 @@ namespace
 		auto path = std::filesystem::path(module_path).parent_path() / "qos-xport";
 		std::error_code ec;
 		std::filesystem::create_directories(path, ec);
-		return path / "launcher.log";
+		return path / "qos-xport.log";
 	}
 
 	void log_component_message(const std::string& message)
