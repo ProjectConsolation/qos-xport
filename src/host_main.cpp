@@ -202,8 +202,13 @@ namespace
 
 	const char* __fastcall localize_lookup_filter_stub(const char* key)
 	{
-		if (runtime::is_standalone_xport_mode() && key)
+		if (runtime::is_standalone_xport_mode())
 		{
+			if (!key)
+			{
+				return "";
+			}
+
 			return key;
 		}
 
