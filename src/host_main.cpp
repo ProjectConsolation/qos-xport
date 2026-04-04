@@ -43,6 +43,7 @@ namespace
 	std::atomic_bool g_bootstrap_zone_load_started = false;
 	std::atomic_bool g_debug_wait_consumed = false;
 	std::atomic_bool g_profile_config_skip_logged = false;
+	std::atomic_bool g_engine_error_seen = false;
 	std::atomic_int g_fs_startup_count = 0;
 	bool g_debugbreak_bootstrap = false;
 	std::atomic_bool g_window_watch_kill = false;
@@ -518,6 +519,7 @@ namespace
 
 		if (!message.empty())
 		{
+			g_engine_error_seen = true;
 			std::lock_guard _(runtime::get_output_mutex());
 			write_console_line("[engine:error] " + message);
 			append_log_line("[engine:error] " + message);
@@ -880,6 +882,7 @@ namespace
 
 		host_print("loaded jb_mp_s.dll");
 		runtime::set_standalone_xport_mode(true);
+		g_engine_error_seen = false;
 
 		try
 		{
@@ -1044,7 +1047,7 @@ namespace
 		wait_for_debugger_if_requested("post-runtime");
 
 		const auto ready_wait_start = GetTickCount64();
-		while ((GetTickCount64() - ready_wait_start) < 1000)
+		while ((GetTickCount64() - ready_wait_start) < 5000)
 		{
 			const auto engine_wait = WaitForSingleObject(thread, 50);
 			if (engine_wait == WAIT_OBJECT_0)
@@ -1067,14 +1070,24 @@ namespace
 				}
 				return fail_and_wait("engine thread exited before initialization completed");
 			}
+
+			if (g_engine_error_seen.load())
+			{
+				g_window_watch_kill = true;
+				if (g_window_watch_thread.joinable())
+				{
+					g_window_watch_thread.join();
+				}
+				return fail_and_wait("engine reported initialization error before ready state");
+			}
 		}
 
-		if (g_bootstrap_zones_ready.load())
+		if (g_bootstrap_zones_ready.load() && !g_engine_error_seen.load())
 		{
 			write_console_line("");
 			write_console_line("");
 			write_console_line("");
-			write_console_line("[QoS-xport: init] =========== initialization complete =============");
+			write_console_line("[QoS-xport] =========== initialization complete =============");
 			write_console_line("[QoS-xport] type 'help' for a list of commands, or 'quit' to exit");
 			append_log_line("[host] initialization complete");
 			append_log_line("[host] type 'help' for a list of commands, or 'quit' to exit");
