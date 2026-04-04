@@ -707,10 +707,33 @@ namespace
 		return result;
 	}
 
+	int handle_engine_thread_exception(_EXCEPTION_POINTERS* exception_info)
+	{
+		if (exception_info && exception_info->ExceptionRecord)
+		{
+			const auto code = exception_info->ExceptionRecord->ExceptionCode;
+			const auto address = reinterpret_cast<std::uintptr_t>(exception_info->ExceptionRecord->ExceptionAddress);
+			append_log_line("[host] engine thread exception code=0x" + hex_address(code) + " address=0x" + hex_address(address));
+		}
+		else
+		{
+			append_log_line("[host] engine thread exception with no exception record");
+		}
+
+		return EXCEPTION_EXECUTE_HANDLER;
+	}
+
 	DWORD WINAPI standalone_engine_thread(LPVOID parameter)
 	{
 		const auto entry = reinterpret_cast<start_main_mp_raw_t>(parameter);
-		return static_cast<DWORD>(call_start_main_mp(entry, 0, 0, GetModuleHandleA(nullptr), 0, 0, 0, 0, 0));
+		__try
+		{
+			return static_cast<DWORD>(call_start_main_mp(entry, 0, 0, GetModuleHandleA(nullptr), 0, 0, 0, 0, 0));
+		}
+		__except (handle_engine_thread_exception(GetExceptionInformation()))
+		{
+			return 0xE0000002;
+		}
 	}
 
 	void hide_xport_windows_loop()
