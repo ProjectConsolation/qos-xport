@@ -726,9 +726,10 @@ namespace
 	DWORD WINAPI standalone_engine_thread(LPVOID parameter)
 	{
 		const auto entry = reinterpret_cast<start_main_mp_raw_t>(parameter);
+		const auto switch_to_thread = reinterpret_cast<int>(::SwitchToThread);
 		__try
 		{
-			return static_cast<DWORD>(call_start_main_mp(entry, 0, 0, GetModuleHandleA(nullptr), 0, 0, 0, 0, 0));
+			return static_cast<DWORD>(call_start_main_mp(entry, 0, switch_to_thread, GetModuleHandleA(nullptr), 0, 0, 0, 0, 0));
 		}
 		__except (handle_engine_thread_exception(GetExceptionInformation()))
 		{
