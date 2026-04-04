@@ -49,6 +49,7 @@ namespace
 	void host_print(const std::string& message);
 	void write_console_line(const std::string& line);
 	void host_patch_print(const std::string& message);
+	void host_section_print(const std::string& message);
 	bool should_suppress_engine_error(const std::string& message);
 	bool should_suppress_engine_line(const std::string& message);
 	std::string lower_copy(std::string value);
@@ -349,6 +350,13 @@ namespace
 		append_log_line(message);
 	}
 
+	void host_section_print(const std::string& message)
+	{
+		std::lock_guard _(runtime::get_output_mutex());
+		write_console_line(message);
+		append_log_line(message);
+	}
+
 	void write_console_line(const std::string& line)
 	{
 		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -525,24 +533,24 @@ namespace
 		}
 
 		const bool trusted_names = (source == zone_trace_manual);
-		host_print(std::string(source_name) + " zone_count=" + std::to_string(zone_count));
-		host_print(std::string("[host - zone sync] sync=") + std::to_string(sync ? 1 : 0));
-		host_print("[host - zones] =======================");
+		host_section_print(std::string("[host - zone count] ") + source_name + " zone_count = " + std::to_string(zone_count));
+		host_section_print(std::string("[host - zone sync] sync = ") + std::to_string(sync ? 1 : 0));
+		host_section_print("[host - zones] =======================");
 		for (int i = 0; i < zone_count; ++i)
 		{
-			host_print(std::string("[host - zones] ") + describe_zone_name(zone_info[i].name, trusted_names));
+			host_section_print(std::string("[host - zones] ") + describe_zone_name(zone_info[i].name, trusted_names));
 		}
-		host_print("[host - zones] =======================");
+		host_section_print("[host - zones] =======================");
 	}
 
 	void log_file_load_refs()
 	{
-		host_print("[host - refs] =======================");
-		host_print("[host - refs] FS_Startup=0x10272D80");
-		host_print("[host - refs] ExecConfig=0x103F5820");
-		host_print("[host - refs] Scr_ReadFile_FastFile=0x1022DF13");
-		host_print("[host - refs] DB_LoadXAssets=0x103E1CF0");
-		host_print("[host - refs] =======================");
+		host_section_print("[host - refs] =======================");
+		host_section_print("[host - refs] FS_Startup = 0x10272D80");
+		host_section_print("[host - refs] ExecConfig = 0x103F5820");
+		host_section_print("[host - refs] Scr_ReadFile_FastFile = 0x1022DF13");
+		host_section_print("[host - refs] DB_LoadXAssets = 0x103E1CF0");
+		host_section_print("[host - refs] =======================");
 	}
 
 	void reinforce_engine_imports()
@@ -814,6 +822,7 @@ namespace
 
 		try
 		{
+			host_section_print("[host - patch] =======================");
 			host_print("patching detours...");
 			apply_detour(g_xlive_patch_a, 0x10240B30, xlive_ret_one_stub);
 			apply_detour(g_xlive_patch_b, 0x10240A30, xlive_ret_one_stub);
@@ -838,6 +847,7 @@ namespace
 			apply_detour(g_com_error_hook, 0x103F77B0, com_error_stub);
 			apply_detour(g_fs_startup_patch, 0x10272D80, fs_startup_host_stub);
 
+			host_section_print("[host - patch] =======================");
 			host_print("patching jumps...");
 			apply_jump(0x1024D8E9, 0x1024D909);
 			apply_jump(0x103F7156, 0x103F7162);
@@ -846,9 +856,12 @@ namespace
 			apply_jump(0x103F9BC1, 0x103F9BD7);
 			apply_jump(0x103F9B5A, 0x103F9B85);
 
+			host_section_print("[host - patch] =======================");
 			host_print("patching nops...");
 			apply_nop(0x102489A1, 5);
+			apply_nop(0x10245B68, 2);
 
+			host_section_print("[host - patch] =======================");
 			host_print("patching callsites...");
 			apply_gfxconfig_callsite_patch();
 			host_patch_print("[patch - nop] 0x103F9A71 (5 bytes)");
@@ -858,7 +871,9 @@ namespace
 			host_patch_print("[patch - nop] 0x103209F8 (5 bytes)");
 			utils::hook::nop(game::game_offset(0x103209F8), 5);
 			reinforce_engine_imports();
+			host_section_print("[host - patch] =======================");
 			host_patch_print("[host - patch] all patches applied");
+			host_section_print("[host - patch] =======================");
 			log_file_load_refs();
 		}
 		catch (const std::exception& error)
