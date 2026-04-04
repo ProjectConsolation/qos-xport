@@ -486,7 +486,6 @@ namespace
 		}
 
 		host_print("debugger attached");
-		DebugBreak();
 	}
 
 	__declspec(naked) void db_load_xassets_stub()
@@ -500,7 +499,7 @@ namespace
 			push dword ptr [ebp + 12]
 			push dword ptr [ebp + 8]
 			push edx
-			push offset g_zone_trace_original
+			push dword ptr [g_zone_trace_original]
 			call log_zone_load_request
 			add esp, 16
 			push dword ptr [ebp + 12]
@@ -521,7 +520,7 @@ namespace
 			push 0
 			push 5
 			push offset g_bootstrap_zones
-			push offset g_zone_trace_redirect
+			push dword ptr [g_zone_trace_redirect]
 			call log_zone_load_request
 			add esp, 16
 			popad
