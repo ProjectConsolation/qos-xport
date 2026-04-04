@@ -58,7 +58,7 @@ namespace
 	};
 	void log_zone_load_request(int source, game::qos::XZoneInfo* zone_info, int zone_count, int sync);
 	bool should_debugbreak_bootstrap();
-	void wait_for_debugger_if_requested();
+	void wait_for_debugger_if_requested(const char* stage);
 	std::string describe_zone_name(const char* name, bool trusted);
 	void perform_bootstrap_zone_load();
 	int __cdecl fs_startup_host_stub();
