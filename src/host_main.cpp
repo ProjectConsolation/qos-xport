@@ -545,17 +545,23 @@ namespace
 
 	void log_file_load_refs()
 	{
-		host_section_print("[host - refs] =======================");
+		host_section_print("[host - refs]  =======================");
 		host_section_print("[host - refs] FS_Startup = 0x10272D80");
 		host_section_print("[host - refs] ExecConfig = 0x103F5820");
 		host_section_print("[host - refs] Scr_ReadFile_FastFile = 0x1022DF13");
 		host_section_print("[host - refs] DB_LoadXAssets = 0x103E1CF0");
-		host_section_print("[host - refs] =======================");
+		host_section_print("[host - refs]  =======================");
 	}
 
 	void reinforce_engine_imports()
 	{
 		utils::hook::set<void*>(game::game_offset(0x104761C4), reinterpret_cast<void*>(::SwitchToThread));
+		utils::hook::set<void*>(game::game_offset(0x10476344), reinterpret_cast<void*>(::timeGetTime));
+
+		host_section_print("[host - imports] =======================");
+		host_section_print("[host - imports] SwitchToThread = " + hex_address(reinterpret_cast<std::uintptr_t>(*reinterpret_cast<void**>(game::game_offset(0x104761C4)))));
+		host_section_print("[host - imports] timeGetTime   = " + hex_address(reinterpret_cast<std::uintptr_t>(*reinterpret_cast<void**>(game::game_offset(0x10476344)))));
+		host_section_print("[host - imports] =======================");
 	}
 
 	void perform_bootstrap_zone_load()
