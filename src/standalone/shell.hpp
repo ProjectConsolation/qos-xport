@@ -18,6 +18,7 @@ namespace standalone::shell
 	std::string make_section_banner(const std::string& title);
 	void write_console_line(const std::string& line);
 	void write_shell_line(const std::string& line);
+	void render_shell_prompt();
 	void commit_shell_input_line(const std::string& line);
 	void render_shell_input_line(const std::string& line, size_t previous_length);
 	void clear_console_display();

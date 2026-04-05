@@ -52,6 +52,8 @@ namespace
 	std::atomic_bool g_window_watch_kill = false;
 	std::atomic_bool g_window_hidden_logged = false;
 	std::thread g_window_watch_thread;
+	bool g_shell_input_mode_active = false;
+	DWORD g_original_shell_input_mode = 0;
 
 	using standalone::shell::append_input_log_line;
 	using standalone::shell::append_log_line;
@@ -63,6 +65,7 @@ namespace
 	using standalone::shell::host_section_print;
 	using standalone::shell::make_section_banner;
 	using standalone::shell::make_host_section_line;
+	using standalone::shell::render_shell_prompt;
 	using standalone::shell::render_shell_input_line;
 	using standalone::shell::settle_shell_io;
 	using standalone::shell::write_console_line;
@@ -110,6 +113,54 @@ namespace
 		flush_shell_input_buffer();
 	}
 
+	void activate_shell_input_mode()
+	{
+		const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
+		if (input_handle == INVALID_HANDLE_VALUE || input_handle == nullptr)
+		{
+			return;
+		}
+
+		DWORD mode = 0;
+		if (!GetConsoleMode(input_handle, &mode))
+		{
+			return;
+		}
+
+		if (!g_shell_input_mode_active)
+		{
+			g_original_shell_input_mode = mode;
+			g_shell_input_mode_active = true;
+		}
+
+		DWORD shell_mode = mode;
+		shell_mode |= ENABLE_EXTENDED_FLAGS;
+		shell_mode |= ENABLE_PROCESSED_INPUT;
+		shell_mode |= ENABLE_ECHO_INPUT;
+		shell_mode |= ENABLE_LINE_INPUT;
+		shell_mode &= ~ENABLE_MOUSE_INPUT;
+		shell_mode &= ~ENABLE_QUICK_EDIT_MODE;
+
+		SetConsoleMode(input_handle, shell_mode);
+		FlushConsoleInputBuffer(input_handle);
+	}
+
+	void restore_shell_input_mode()
+	{
+		if (!g_shell_input_mode_active)
+		{
+			return;
+		}
+
+		const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
+		if (input_handle != INVALID_HANDLE_VALUE && input_handle != nullptr)
+		{
+			SetConsoleMode(input_handle, g_original_shell_input_mode);
+		}
+
+		g_shell_input_mode_active = false;
+	}
+
 	bool process_shell_input_line(const std::string& line)
 	{
 		if (line == "quit" || line == "exit")
@@ -140,11 +191,11 @@ namespace
 	{
 		line.clear();
 		engine_terminated = false;
+		const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
 
 		settle_shell_io();
-		render_shell_input_line(line, 0);
+		render_shell_prompt();
 
-		size_t previous_length = 0;
 		while (true)
 		{
 			if (engine_thread)
@@ -157,47 +208,59 @@ namespace
 				}
 			}
 
-			if (!_kbhit())
+			if (input_handle == INVALID_HANDLE_VALUE || input_handle == nullptr)
 			{
 				Sleep(10);
 				continue;
 			}
 
-			auto key = _getch();
-			if (key == 0 || key == 224)
+			const auto input_wait = WaitForSingleObject(input_handle, 10);
+			if (input_wait != WAIT_OBJECT_0)
 			{
-				(void)_getch();
 				continue;
 			}
 
-			if (key == '\r')
+			wchar_t wide_buffer[512]{};
+			DWORD chars_read = 0;
+			if (!ReadConsoleW(input_handle, wide_buffer, static_cast<DWORD>(std::size(wide_buffer) - 1), &chars_read, nullptr))
 			{
-				commit_shell_input_line(line);
-				return true;
+				continue;
 			}
 
-			if (key == '\b')
+			if (chars_read == 0)
 			{
-				if (!line.empty())
+				continue;
+			}
+
+			std::wstring wide_line(wide_buffer, chars_read);
+			while (!wide_line.empty() && (wide_line.back() == L'\r' || wide_line.back() == L'\n'))
+			{
+				wide_line.pop_back();
+			}
+
+			if (!wide_line.empty())
+			{
+				const auto required = WideCharToMultiByte(CP_UTF8, 0, wide_line.c_str(), static_cast<int>(wide_line.size()), nullptr, 0, nullptr, nullptr);
+				if (required > 0)
 				{
-					previous_length = line.size();
-					line.pop_back();
-					render_shell_input_line(line, previous_length);
+					line.resize(required);
+					WideCharToMultiByte(CP_UTF8, 0, wide_line.c_str(), static_cast<int>(wide_line.size()), line.data(), required, nullptr, nullptr);
 				}
-				continue;
 			}
 
-			if (key >= 32 && key < 127)
-			{
-				previous_length = line.size();
-				line.push_back(static_cast<char>(key));
-				render_shell_input_line(line, previous_length);
-			}
+			commit_shell_input_line(line);
+			return true;
 		}
 	}
 
 	bool run_shell_loop(HANDLE engine_thread = nullptr)
 	{
+		activate_shell_input_mode();
+		const auto restore_input = gsl::finally([]()
+		{
+			restore_shell_input_mode();
+		});
+
 		std::string line;
 		while (true)
 		{
@@ -1042,7 +1105,6 @@ namespace
 			utils::hook::nop(game::game_offset(0x103209F8), 5);
 			reinforce_engine_imports();
 			host_patch_print("[host:patch] all patches applied");
-			host_section_print(make_section_banner("patches applied"));
 			log_file_load_refs();
 		}
 		catch (const std::exception& error)

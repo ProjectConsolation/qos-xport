@@ -1,39 +1,24 @@
 #include <std_include.hpp>
 #include "component_loader.hpp"
 #include "standalone/runtime.hpp"
+#include "standalone/shell.hpp"
 
 namespace
 {
 	void write_console_line(const std::string& line)
 	{
 		std::lock_guard _(runtime::get_output_mutex());
-
-		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
-		if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
-		{
-			DWORD mode = 0;
-			if (GetConsoleMode(handle, &mode))
-			{
-				const auto with_newline = line + "\r\n";
-				DWORD written = 0;
-				WriteConsoleA(handle, with_newline.data(), static_cast<DWORD>(with_newline.size()), &written, nullptr);
-				return;
-			}
-		}
-
-		std::fwrite(line.data(), 1, line.size(), stdout);
-		std::fwrite("\n", 1, 1, stdout);
-		std::fflush(stdout);
+		standalone::shell::write_console_line(line);
 	}
 
 	void log_component_message(const std::string& message)
 	{
-		runtime::append_log_line("[runtime] " + message);
+		runtime::append_log_line("[component_loader] " + message);
 	}
 
 	void print_component_console_progress(const char* phase, const std::string& component_name)
 	{
-		write_console_line(std::string("[runtime - ") + phase + "] " + component_name);
+		write_console_line(std::string("[component_loader:") + phase + "] " + component_name);
 	}
 }
 
