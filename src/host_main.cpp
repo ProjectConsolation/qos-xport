@@ -54,6 +54,7 @@ namespace
 	std::thread g_window_watch_thread;
 
 	void append_log_line(const std::string& line);
+	void append_input_log_line(const std::string& line);
 	void host_print(const std::string& message);
 	void write_console_line(const std::string& line);
 	void host_patch_print(const std::string& message);
@@ -109,7 +110,17 @@ namespace
 		if (!line.empty())
 		{
 			append_input_log_line(line);
-			command::execute(line);
+			if (runtime::is_standalone_xport_mode())
+			{
+				if (!command::execute_local(line))
+				{
+					host_print("unknown standalone command");
+				}
+			}
+			else
+			{
+				command::execute(line);
+			}
 		}
 
 		return true;

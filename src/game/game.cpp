@@ -1,6 +1,7 @@
 #include <std_include.hpp>
 
 #include "component/console.hpp"
+#include "runtime.hpp"
 
 #include "game/game.hpp"
 #include "game/structs.IW4.hpp"
@@ -11,6 +12,14 @@
 
 namespace game
 {
+	namespace
+	{
+		void log_early_command_message(const std::string& message)
+		{
+			OutputDebugStringA(message.c_str());
+		}
+	}
+
 	HMODULE mp_dll = nullptr;
 
 	uintptr_t game_offset(uintptr_t ida_address)
@@ -58,7 +67,14 @@ namespace game
 		{
 			if (function)
 			{
-				console::error("Cmd_AddCommand: %s already defined\n", name);
+				if (runtime::is_standalone_xport_mode() && !runtime::is_initialized())
+				{
+					log_early_command_message(std::string("Cmd_AddCommand: ") + name + " already defined\n");
+				}
+				else
+				{
+					console::error("Cmd_AddCommand: %s already defined\n", name);
+				}
 			}
 		}
 		else
@@ -67,7 +83,14 @@ namespace game
 			cmd->function = function;
 			cmd->next = *cmd_functions;
 			*cmd_functions = cmd;
-			console::debug("registered cmd '%s'\n", name);
+			if (runtime::is_standalone_xport_mode() && !runtime::is_initialized())
+			{
+				log_early_command_message(std::string("registered cmd '") + name + "'\n");
+			}
+			else
+			{
+				console::debug("registered cmd '%s'\n", name);
+			}
 		}
 	}
 

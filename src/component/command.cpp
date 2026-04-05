@@ -3,6 +3,7 @@
 
 #include "command.hpp"
 #include "console.hpp"
+#include "../runtime.hpp"
 #include "scheduler.hpp"
 
 #include <utils/memory.hpp>
@@ -16,6 +17,83 @@ namespace command
 
 		std::unordered_map<std::string, std::function<void(params&)>> handlers;
 		std::unordered_map<std::string, help_entry> help_entries;
+		thread_local bool local_dispatch = false;
+		thread_local std::vector<std::string> local_args;
+
+		std::filesystem::path get_launcher_log_path()
+		{
+			char module_path[MAX_PATH]{};
+			GetModuleFileNameA(nullptr, module_path, MAX_PATH);
+			auto path = std::filesystem::path(module_path).parent_path() / "qos-xport";
+			std::error_code ec;
+			std::filesystem::create_directories(path, ec);
+			return path / "qos-xport.log";
+		}
+
+		void append_standalone_log_line(const std::string& line)
+		{
+			const auto path = get_launcher_log_path();
+			const auto handle = CreateFileA(
+				path.string().c_str(),
+				FILE_APPEND_DATA,
+				FILE_SHARE_READ | FILE_SHARE_WRITE,
+				nullptr,
+				OPEN_ALWAYS,
+				FILE_ATTRIBUTE_NORMAL,
+				nullptr
+			);
+
+			if (handle == INVALID_HANDLE_VALUE)
+			{
+				return;
+			}
+
+			const auto close_handle = gsl::finally([&]()
+			{
+				CloseHandle(handle);
+			});
+
+			const auto with_newline = line + "\r\n";
+			DWORD bytes_written = 0;
+			WriteFile(handle, with_newline.data(), static_cast<DWORD>(with_newline.size()), &bytes_written, nullptr);
+		}
+
+		void print_command_line(const std::string& line)
+		{
+			if (!runtime::is_standalone_xport_mode())
+			{
+				console::info("%s\n", line.c_str());
+				return;
+			}
+
+			std::lock_guard _(runtime::get_output_mutex());
+
+			const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
+			if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
+			{
+				DWORD mode = 0;
+				if (GetConsoleMode(handle, &mode))
+				{
+					const auto with_newline = line + "\r\n";
+					DWORD written = 0;
+					WriteConsoleA(handle, with_newline.data(), static_cast<DWORD>(with_newline.size()), &written, nullptr);
+				}
+				else
+				{
+					std::fwrite(line.data(), 1, line.size(), stdout);
+					std::fwrite("\n", 1, 1, stdout);
+					std::fflush(stdout);
+				}
+			}
+			else
+			{
+				std::fwrite(line.data(), 1, line.size(), stdout);
+				std::fwrite("\n", 1, 1, stdout);
+				std::fflush(stdout);
+			}
+
+			append_standalone_log_line("[shell] " + line);
+		}
 
 		void main_handler()
 		{
@@ -30,17 +108,32 @@ namespace command
 	}
 
 	params::params()
-		: nesting_(*game::command_id)
+		: nesting_(local_dispatch ? std::numeric_limits<DWORD>::max() : *game::command_id)
 	{
 	}
 
 	int params::size() const
 	{
+		if (this->nesting_ == std::numeric_limits<DWORD>::max())
+		{
+			return static_cast<int>(local_args.size());
+		}
+
 		return game::cmd_argc[this->nesting_];
 	}
 
 	const char* params::get(const int index) const
 	{
+		if (this->nesting_ == std::numeric_limits<DWORD>::max())
+		{
+			if (index >= this->size())
+			{
+				return "";
+			}
+
+			return local_args[static_cast<size_t>(index)].c_str();
+		}
+
 		if (index >= this->size())
 		{
 			return "";
@@ -80,7 +173,7 @@ namespace command
 	{
 		const auto command = utils::string::to_lower(name);
 
-		if (handlers.find(command) == handlers.end())
+		if (handlers.find(command) == handlers.end() && !runtime::is_standalone_xport_mode())
 			add_raw(name, main_handler);
 
 		handlers[command] = callback;
@@ -111,6 +204,63 @@ namespace command
 		game::Cbuf_AddText(0, command.data());
 	}
 
+	bool execute_local(const std::string& command_line)
+	{
+		local_args.clear();
+
+		std::string current;
+		bool in_quotes = false;
+
+		for (const char c : command_line)
+		{
+			if (c == '"')
+			{
+				in_quotes = !in_quotes;
+				continue;
+			}
+
+			if (!in_quotes && std::isspace(static_cast<unsigned char>(c)))
+			{
+				if (!current.empty())
+				{
+					local_args.push_back(std::move(current));
+					current.clear();
+				}
+				continue;
+			}
+
+			current.push_back(c);
+		}
+
+		if (!current.empty())
+		{
+			local_args.push_back(std::move(current));
+		}
+
+		if (local_args.empty())
+		{
+			return false;
+		}
+
+		const auto command = utils::string::to_lower(local_args[0]);
+		const auto handler = handlers.find(command);
+		if (handler == handlers.end())
+		{
+			return false;
+		}
+
+		local_dispatch = true;
+		const auto dispatch_guard = gsl::finally([]()
+		{
+			local_dispatch = false;
+			local_args.clear();
+		});
+
+		params params{};
+		handler->second(params);
+		return true;
+	}
+
 	std::vector<help_entry> get_help_entries()
 	{
 		std::vector<help_entry> entries;
@@ -139,18 +289,18 @@ namespace command
 				add("help", []()
 				{
 					const auto entries = get_help_entries();
-					console::info("available commands:\n");
+					print_command_line("available commands:");
 
 					for (const auto& entry : entries)
 					{
-						console::info(" - %s\n", entry.name.c_str());
+						print_command_line(" - " + entry.name);
 						if (!entry.description.empty())
 						{
-							console::info("   %s\n", entry.description.c_str());
+							print_command_line("   " + entry.description);
 						}
 						if (!entry.example.empty())
 						{
-							console::info("   example: %s\n", entry.example.c_str());
+							print_command_line("   example: " + entry.example);
 						}
 					}
 				});
@@ -158,7 +308,7 @@ namespace command
 
 				add("hello", []()
 				{
-					console::info("hello from qos-xport!\n");
+					print_command_line("hello from qos-xport!");
 				});
 				set_help("hello", "Test the standalone command shell.", "hello");
 			}, scheduler::main);
