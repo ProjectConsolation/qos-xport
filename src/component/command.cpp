@@ -2,7 +2,7 @@
 #include "loader/component_loader.hpp"
 
 #include "command.hpp"
-#include "../runtime.hpp"
+#include "../game/symbols.hpp"
 #include "scheduler.hpp"
 
 #include <utils/memory.hpp>
@@ -16,75 +16,6 @@ namespace command
 
 		std::unordered_map<std::string, std::function<void(params&)>> handlers;
 		std::unordered_map<std::string, help_entry> help_entries;
-
-		std::filesystem::path get_launcher_log_path()
-		{
-			char module_path[MAX_PATH]{};
-			GetModuleFileNameA(nullptr, module_path, MAX_PATH);
-			auto path = std::filesystem::path(module_path).parent_path() / "qos-xport";
-			std::error_code ec;
-			std::filesystem::create_directories(path, ec);
-			return path / "qos-xport.log";
-		}
-
-		void append_shell_log_line(const std::string& line)
-		{
-			const auto path = get_launcher_log_path();
-			const auto handle = CreateFileA(
-				path.string().c_str(),
-				FILE_APPEND_DATA,
-				FILE_SHARE_READ | FILE_SHARE_WRITE,
-				nullptr,
-				OPEN_ALWAYS,
-				FILE_ATTRIBUTE_NORMAL,
-				nullptr
-			);
-
-			if (handle == INVALID_HANDLE_VALUE)
-			{
-				return;
-			}
-
-			const auto close_handle = gsl::finally([&]()
-			{
-				CloseHandle(handle);
-			});
-
-			const auto with_newline = line + "\r\n";
-			DWORD bytes_written = 0;
-			WriteFile(handle, with_newline.data(), static_cast<DWORD>(with_newline.size()), &bytes_written, nullptr);
-		}
-
-		void write_shell_line(const std::string& line)
-		{
-			std::lock_guard _(runtime::get_output_mutex());
-
-			const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
-			if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
-			{
-				DWORD mode = 0;
-				if (GetConsoleMode(handle, &mode))
-				{
-					const auto with_newline = line + "\r\n";
-					DWORD written = 0;
-					WriteConsoleA(handle, with_newline.data(), static_cast<DWORD>(with_newline.size()), &written, nullptr);
-				}
-				else
-				{
-					std::fwrite(line.data(), 1, line.size(), stdout);
-					std::fwrite("\n", 1, 1, stdout);
-					std::fflush(stdout);
-				}
-			}
-			else
-			{
-				std::fwrite(line.data(), 1, line.size(), stdout);
-				std::fwrite("\n", 1, 1, stdout);
-				std::fflush(stdout);
-			}
-
-			append_shell_log_line("[shell] " + line);
-		}
 
 		void main_handler()
 		{
@@ -208,18 +139,18 @@ namespace command
 				add("help", []()
 				{
 					const auto entries = get_help_entries();
-					write_shell_line("[QoS-xport] available commands:");
+					game::Com_Printf(0, "available commands:\n");
 
 					for (const auto& entry : entries)
 					{
-						write_shell_line("[QoS-xport] - " + entry.name);
+						game::Com_Printf(0, " - %s\n", entry.name.c_str());
 						if (!entry.description.empty())
 						{
-							write_shell_line("[QoS-xport]   " + entry.description);
+							game::Com_Printf(0, "   %s\n", entry.description.c_str());
 						}
 						if (!entry.example.empty())
 						{
-							write_shell_line("[QoS-xport]   example: " + entry.example);
+							game::Com_Printf(0, "   example: %s\n", entry.example.c_str());
 						}
 					}
 				});
@@ -227,7 +158,7 @@ namespace command
 
 				add("hello", []()
 				{
-					write_shell_line("[QoS-xport] hello from qos-xport!");
+					game::Com_Printf(0, "hello from qos-xport!\n");
 				});
 				set_help("hello", "Test the standalone command shell.", "hello");
 			}, scheduler::main);
