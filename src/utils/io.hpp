@@ -13,3 +13,4 @@ namespace utils::io
 	bool directory_is_empty(const std::string& directory);
 	std::vector<std::string> list_files(const std::string& directory);
 }
+

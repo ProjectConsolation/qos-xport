@@ -1,5 +1,5 @@
 #include <std_include.hpp>
-#include "loader/component_loader.hpp"
+#include "component/component_loader.hpp"
 
 #include "game/game.hpp"
 #include "game/structs.IW4.hpp"
@@ -44,3 +44,4 @@ namespace physpreset
 }
 
 REGISTER_COMPONENT(physpreset::component)
+

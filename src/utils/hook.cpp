@@ -194,3 +194,4 @@ namespace utils::hook
 		return result;
 	}
 }
+

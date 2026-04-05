@@ -36,3 +36,4 @@ namespace command
 	bool execute_local(const std::string& command_line);
 	std::vector<help_entry> get_help_entries();
 }
+

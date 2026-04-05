@@ -1,5 +1,5 @@
 #include <std_include.hpp>
-#include "loader/component_loader.hpp"
+#include "component/component_loader.hpp"
 
 #include "console.hpp"
 #include "filesystem.hpp"
@@ -366,3 +366,4 @@ namespace gsc
 }
 
 REGISTER_COMPONENT(gsc::component)
+

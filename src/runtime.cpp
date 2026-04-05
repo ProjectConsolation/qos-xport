@@ -2,7 +2,7 @@
 
 #include "runtime.hpp"
 
-#include "loader/component_loader.hpp"
+#include "component/component_loader.hpp"
 
 #include <utils/hook.hpp>
 #include <utils/io.hpp>
@@ -222,3 +222,4 @@ namespace runtime
 		return output_mutex;
 	}
 }
+

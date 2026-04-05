@@ -23,3 +23,4 @@ namespace standalone::shell
 
 	std::string make_host_section_line(const std::string& label, const std::string& message);
 }
+

@@ -1,5 +1,5 @@
 #include <std_include.hpp>
-#include "loader/component_loader.hpp"
+#include "component/component_loader.hpp"
 
 #include "console.hpp"
 #include "scheduler.hpp"
@@ -516,3 +516,4 @@ namespace console
 }
 
 REGISTER_COMPONENT(console::component)
+

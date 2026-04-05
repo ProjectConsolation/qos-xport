@@ -1,5 +1,5 @@
 #include <std_include.hpp>
-#include "loader/component_loader.hpp"
+#include "component/component_loader.hpp"
 
 #include "console.hpp"
 #include "scheduler.hpp"
@@ -90,3 +90,4 @@ namespace patches
 }
 
 REGISTER_COMPONENT(patches::component)
+

@@ -15,3 +15,4 @@ namespace runtime
 	void append_log_line(const std::string& line);
 	std::mutex& get_output_mutex();
 }
+

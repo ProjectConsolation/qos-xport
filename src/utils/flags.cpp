@@ -48,3 +48,4 @@ namespace utils::flags
 		return false;
 	}
 }
+

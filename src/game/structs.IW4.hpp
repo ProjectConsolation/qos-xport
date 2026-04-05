@@ -2675,3 +2675,4 @@ namespace game::iw4
 		//AddonMapEnts* addonMapEnts;
 	};
 }
+

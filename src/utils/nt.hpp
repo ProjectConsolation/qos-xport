@@ -92,3 +92,4 @@ namespace utils::nt
 	void relaunch_self();
 	__declspec(noreturn) void terminate(uint32_t code = 0);
 }
+

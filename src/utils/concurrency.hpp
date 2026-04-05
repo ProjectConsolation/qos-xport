@@ -44,3 +44,4 @@ namespace utils::concurrency
 		T object_{};
 	};
 }
+

@@ -261,3 +261,4 @@ namespace utils::nt
 		TerminateProcess(GetCurrentProcess(), code);
 	}
 }
+

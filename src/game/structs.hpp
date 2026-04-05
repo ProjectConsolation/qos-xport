@@ -2051,3 +2051,4 @@ namespace game::qos
 		STATIC_MODEL_FLAG_NO_SHADOW = 0x1,
 	};
 }
+

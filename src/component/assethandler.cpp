@@ -1,6 +1,6 @@
 #include <std_include.hpp>
 
-#include "loader/component_loader.hpp"
+#include "component/component_loader.hpp"
 
 #include "component/command.hpp"
 #include "component/console.hpp"
@@ -394,3 +394,4 @@ namespace assethandler
 }
 
 REGISTER_COMPONENT(assethandler::component)
+

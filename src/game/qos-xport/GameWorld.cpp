@@ -1,5 +1,5 @@
 #include <std_include.hpp>
-#include "loader/component_loader.hpp"
+#include "component/component_loader.hpp"
 
 #include "component/assethandler.hpp"
 #include "component/command.hpp"
@@ -83,3 +83,4 @@ namespace gameworld
 }
 
 REGISTER_COMPONENT(gameworld::component)
+

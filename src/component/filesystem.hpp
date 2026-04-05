@@ -13,3 +13,4 @@ namespace filesystem
 	std::vector<std::string> get_search_paths();
 	std::vector<std::string> get_search_paths_rev();
 }
+

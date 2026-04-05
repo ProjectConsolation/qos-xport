@@ -67,3 +67,4 @@ namespace build_info
 		return "QoS-xport [" + get_version_tag() + "]";
 	}
 }
+

@@ -158,3 +158,4 @@ std::vector<std::unique_ptr<component_interface>>& component_loader::get_compone
 
 	return *components;
 }
+

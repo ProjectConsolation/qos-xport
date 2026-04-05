@@ -135,3 +135,4 @@ namespace utils::hook
 		return get<T>(reinterpret_cast<void*>(place));
 	}
 }
+

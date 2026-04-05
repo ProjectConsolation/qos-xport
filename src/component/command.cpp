@@ -1,5 +1,5 @@
 #include <std_include.hpp>
-#include "loader/component_loader.hpp"
+#include "component/component_loader.hpp"
 
 #include "command.hpp"
 #include "console.hpp"
@@ -260,3 +260,4 @@ namespace command
 }
 
 REGISTER_COMPONENT(command::component)
+

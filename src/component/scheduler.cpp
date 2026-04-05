@@ -1,5 +1,5 @@
 #include <std_include.hpp>
-#include "loader/component_loader.hpp"
+#include "component/component_loader.hpp"
 
 #include "scheduler.hpp"
 #include "../runtime.hpp"
@@ -208,3 +208,4 @@ namespace scheduler
 }
 
 REGISTER_COMPONENT(scheduler::component)
+

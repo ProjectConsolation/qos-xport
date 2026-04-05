@@ -42,3 +42,4 @@ namespace console
 		print(con_type_info, fmt, std::forward<Args>(args)...);
 	}
 }
+

@@ -1,5 +1,5 @@
 #include <std_include.hpp>
-#include "loader/component_loader.hpp"
+#include "component/component_loader.hpp"
 #include "game/game.hpp"
 
 #include "scheduler.hpp"
@@ -134,3 +134,4 @@ namespace exception
 }
 
 //REGISTER_COMPONENT(exception::component)
+

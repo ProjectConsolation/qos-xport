@@ -85,3 +85,4 @@ namespace utils::string
 
 	std::string get_timestamp();
 }
+

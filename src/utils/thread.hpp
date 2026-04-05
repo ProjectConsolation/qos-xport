@@ -23,3 +23,4 @@ namespace utils::thread
 	void suspend_other_threads();
 	void resume_other_threads();
 }
+
