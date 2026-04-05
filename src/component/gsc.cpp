@@ -144,9 +144,9 @@ namespace gsc
 			}
 
 			const auto* name_str = name.data();
-			const auto asset = game::DB_FindXAssetHeader_Internal(game::ASSET_TYPE_RAWFILE, name_str, false);
+			const auto asset = game::DB_FindXAssetHeader_Internal(game::qos::ASSET_TYPE_RAWFILE, name_str, false);
 			if (asset.rawfile && asset.rawfile->buffer && asset.rawfile->len > 0 &&
-				!game::DB_IsXAssetDefault(game::ASSET_TYPE_RAWFILE, name_str))
+				!game::DB_IsXAssetDefault(game::qos::ASSET_TYPE_RAWFILE, name_str))
 			{
 				data->assign(asset.rawfile->buffer, asset.rawfile->len);
 				if (!data->empty() && data->back() == '\0')
