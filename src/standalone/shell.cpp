@@ -86,6 +86,30 @@ namespace standalone::shell
 		HANDLE g_console_output_handle = nullptr;
 		HANDLE g_console_input_handle = nullptr;
 
+		HANDLE open_console_output_device()
+		{
+			return CreateFileA(
+				"CONOUT$",
+				GENERIC_READ | GENERIC_WRITE,
+				FILE_SHARE_READ | FILE_SHARE_WRITE,
+				nullptr,
+				OPEN_EXISTING,
+				0,
+				nullptr);
+		}
+
+		HANDLE open_console_input_device()
+		{
+			return CreateFileA(
+				"CONIN$",
+				GENERIC_READ | GENERIC_WRITE,
+				FILE_SHARE_READ | FILE_SHARE_WRITE,
+				nullptr,
+				OPEN_EXISTING,
+				0,
+				nullptr);
+		}
+
 		std::string lower_copy(std::string value)
 		{
 			std::transform(value.begin(), value.end(), value.begin(), [](const unsigned char c)
@@ -365,13 +389,31 @@ namespace standalone::shell
 	{
 		if (!g_console_output_handle || g_console_output_handle == INVALID_HANDLE_VALUE)
 		{
-			const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
+			auto handle = open_console_output_device();
+			if (handle == INVALID_HANDLE_VALUE || handle == nullptr)
+			{
+				handle = GetStdHandle(STD_OUTPUT_HANDLE);
+			}
+
 			if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
 			{
 				g_console_output_handle = handle;
 			}
 		}
 
+		if (!g_console_input_handle || g_console_input_handle == INVALID_HANDLE_VALUE)
+		{
+			auto handle = open_console_input_device();
+			if (handle == INVALID_HANDLE_VALUE || handle == nullptr)
+			{
+				handle = GetStdHandle(STD_INPUT_HANDLE);
+			}
+
+			if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
+			{
+				g_console_input_handle = handle;
+			}
+		}
 	}
 
 	HANDLE get_console_output_handle()
@@ -382,12 +424,7 @@ namespace standalone::shell
 
 	HANDLE get_console_input_handle()
 	{
-		const auto handle = GetStdHandle(STD_INPUT_HANDLE);
-		if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
-		{
-			g_console_input_handle = handle;
-		}
-
+		capture_console_handles();
 		return g_console_input_handle;
 	}
 
