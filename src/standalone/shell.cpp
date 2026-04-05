@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <deque>
 #include <optional>
 #include <string_view>
 
@@ -56,8 +57,11 @@ namespace standalone::shell
 		struct prompt_state
 		{
 			bool active = false;
-			std::string line;
-			size_t previous_length = 0;
+			std::string buffer;
+			size_t cursor = 0;
+			std::int32_t history_index = -1;
+			std::deque<std::string> history{};
+			SHORT row = -1;
 		};
 
 		constexpr std::array k_tag_rules =
@@ -127,11 +131,29 @@ namespace standalone::shell
 			WriteConsoleA(handle, k_prompt_name, static_cast<DWORD>(std::strlen(k_prompt_name)), &written, nullptr);
 			SetConsoleTextAttribute(handle, k_color_white);
 			WriteConsoleA(handle, k_prompt_suffix, static_cast<DWORD>(std::strlen(k_prompt_suffix)), &written, nullptr);
-			if (!g_prompt_state.line.empty())
+			if (!g_prompt_state.buffer.empty())
 			{
-				WriteConsoleA(handle, g_prompt_state.line.data(), static_cast<DWORD>(g_prompt_state.line.size()), &written, nullptr);
+				WriteConsoleA(handle, g_prompt_state.buffer.data(), static_cast<DWORD>(g_prompt_state.buffer.size()), &written, nullptr);
 			}
 			SetConsoleTextAttribute(handle, original_attributes);
+		}
+
+		size_t get_max_input_length(HANDLE handle)
+		{
+			CONSOLE_SCREEN_BUFFER_INFO info{};
+			if (!GetConsoleScreenBufferInfo(handle, &info))
+			{
+				return 510;
+			}
+
+			const auto columns = static_cast<size_t>(info.dwSize.X);
+			const auto prompt_length = std::strlen(k_prompt_name) + std::strlen(k_prompt_suffix);
+			if (columns <= prompt_length + 1)
+			{
+				return 1;
+			}
+
+			return std::min<size_t>(510, columns - prompt_length - 1);
 		}
 
 		void redraw_prompt_locked(HANDLE handle, const WORD original_attributes)
@@ -147,12 +169,14 @@ namespace standalone::shell
 				return;
 			}
 
-			const COORD row_start{ 0, info.dwCursorPosition.Y };
+			const auto row = g_prompt_state.row >= 0 ? g_prompt_state.row : info.dwCursorPosition.Y;
+			const COORD row_start{ 0, row };
 			clear_console_row(handle, row_start, original_attributes);
+			g_prompt_state.row = row_start.Y;
 			draw_prompt_locked(handle, original_attributes);
 			const COORD cursor
 			{
-				static_cast<SHORT>(std::strlen(k_prompt_name) + std::strlen(k_prompt_suffix) + g_prompt_state.line.size()),
+				static_cast<SHORT>(std::strlen(k_prompt_name) + std::strlen(k_prompt_suffix) + g_prompt_state.cursor),
 				row_start.Y
 			};
 			SetConsoleCursorPosition(handle, cursor);
@@ -366,10 +390,12 @@ namespace standalone::shell
 					original_attributes = info.wAttributes;
 				}
 
-				if (g_prompt_state.active)
+				const auto had_prompt = g_prompt_state.active;
+				if (had_prompt)
 				{
-					const COORD row_start{ 0, info.dwCursorPosition.Y };
-					clear_console_row(handle, row_start, original_attributes);
+					const auto row = g_prompt_state.row >= 0 ? g_prompt_state.row : info.dwCursorPosition.Y;
+					clear_console_row(handle, COORD{ 0, row }, original_attributes);
+					SetConsoleCursorPosition(handle, COORD{ 0, row });
 				}
 
 				if (!line.empty() && line.front() == '[' && line.find(']') != std::string::npos)
@@ -400,8 +426,13 @@ namespace standalone::shell
 					write_console_text(handle, line + "\r\n");
 				}
 
-				if (g_prompt_state.active)
+				if (had_prompt)
 				{
+					CONSOLE_SCREEN_BUFFER_INFO after_info{};
+					if (GetConsoleScreenBufferInfo(handle, &after_info))
+					{
+						g_prompt_state.row = after_info.dwCursorPosition.Y;
+					}
 					redraw_prompt_locked(handle, original_attributes);
 				}
 
@@ -446,8 +477,10 @@ namespace standalone::shell
 	{
 		std::lock_guard _(runtime::get_output_mutex());
 		g_prompt_state.active = true;
-		g_prompt_state.line.clear();
-		g_prompt_state.previous_length = 0;
+		g_prompt_state.buffer.clear();
+		g_prompt_state.cursor = 0;
+		g_prompt_state.history_index = -1;
+		g_prompt_state.row = -1;
 
 		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
 		if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
@@ -460,6 +493,7 @@ namespace standalone::shell
 				if (GetConsoleScreenBufferInfo(handle, &info))
 				{
 					original_attributes = info.wAttributes;
+					g_prompt_state.row = info.dwCursorPosition.Y;
 				}
 
 				draw_prompt_locked(handle, original_attributes);
@@ -475,8 +509,10 @@ namespace standalone::shell
 	{
 		std::lock_guard _(runtime::get_output_mutex());
 		g_prompt_state.active = false;
-		g_prompt_state.line.clear();
-		g_prompt_state.previous_length = 0;
+		g_prompt_state.buffer.clear();
+		g_prompt_state.cursor = 0;
+		g_prompt_state.history_index = -1;
+		g_prompt_state.row = -1;
 
 		const auto committed = format_submitted_input_line(line);
 		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -519,8 +555,9 @@ namespace standalone::shell
 	{
 		std::lock_guard _(runtime::get_output_mutex());
 		g_prompt_state.active = true;
-		g_prompt_state.line = line;
-		g_prompt_state.previous_length = std::max(previous_length, line.size());
+		g_prompt_state.buffer = line;
+		g_prompt_state.cursor = line.size();
+		(void)previous_length;
 
 		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
 		if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
@@ -533,6 +570,7 @@ namespace standalone::shell
 				if (GetConsoleScreenBufferInfo(handle, &info))
 				{
 					original_attributes = info.wAttributes;
+					g_prompt_state.row = info.dwCursorPosition.Y;
 				}
 
 				const COORD line_start{ 0, info.dwCursorPosition.Y };
@@ -553,14 +591,8 @@ namespace standalone::shell
 					WriteConsoleA(handle, line.data(), static_cast<DWORD>(line.size()), &written, nullptr);
 				}
 
-				if (g_prompt_state.previous_length > line.size())
-				{
-					const std::string padding(g_prompt_state.previous_length - line.size(), ' ');
-					WriteConsoleA(handle, padding.data(), static_cast<DWORD>(padding.size()), &written, nullptr);
-				}
-
 				const COORD cursor{
-					static_cast<SHORT>(std::strlen(k_prompt_name) + std::strlen(k_prompt_suffix) + line.size()),
+					static_cast<SHORT>(std::strlen(k_prompt_name) + std::strlen(k_prompt_suffix) + g_prompt_state.cursor),
 					line_start.Y
 				};
 				SetConsoleCursorPosition(handle, cursor);
@@ -571,20 +603,180 @@ namespace standalone::shell
 		std::fwrite("\r", 1, 1, stdout);
 		std::fwrite(k_shell_prompt, 1, std::strlen(k_shell_prompt), stdout);
 		std::fwrite(line.data(), 1, line.size(), stdout);
-		if (g_prompt_state.previous_length > line.size())
-		{
-			const std::string padding(g_prompt_state.previous_length - line.size(), ' ');
-			std::fwrite(padding.data(), 1, padding.size(), stdout);
-		}
 		std::fflush(stdout);
+	}
+
+	void begin_shell_input()
+	{
+		render_shell_prompt();
+	}
+
+	bool handle_shell_input_record(const INPUT_RECORD& record, std::string& completed_line)
+	{
+		completed_line.clear();
+
+		if (record.EventType == WINDOW_BUFFER_SIZE_EVENT)
+		{
+			render_shell_input_line(g_prompt_state.buffer, g_prompt_state.buffer.size());
+			return false;
+		}
+
+		if (record.EventType != KEY_EVENT || !record.Event.KeyEvent.bKeyDown)
+		{
+			return false;
+		}
+
+		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
+		switch (record.Event.KeyEvent.wVirtualKeyCode)
+		{
+		case VK_UP:
+			if (!g_prompt_state.history.empty())
+			{
+				if (++g_prompt_state.history_index >= static_cast<std::int32_t>(g_prompt_state.history.size()))
+				{
+					g_prompt_state.history_index = static_cast<std::int32_t>(g_prompt_state.history.size()) - 1;
+				}
+
+				g_prompt_state.buffer = g_prompt_state.history.at(g_prompt_state.history_index);
+				g_prompt_state.cursor = g_prompt_state.buffer.size();
+				render_shell_input_line(g_prompt_state.buffer, g_prompt_state.buffer.size());
+			}
+			return false;
+
+		case VK_DOWN:
+			if (!g_prompt_state.history.empty())
+			{
+				if (--g_prompt_state.history_index < -1)
+				{
+					g_prompt_state.history_index = -1;
+				}
+
+				if (g_prompt_state.history_index == -1)
+				{
+					g_prompt_state.buffer.clear();
+				}
+				else
+				{
+					g_prompt_state.buffer = g_prompt_state.history.at(g_prompt_state.history_index);
+				}
+
+				g_prompt_state.cursor = g_prompt_state.buffer.size();
+				render_shell_input_line(g_prompt_state.buffer, g_prompt_state.buffer.size());
+			}
+			return false;
+
+		case VK_LEFT:
+			if (g_prompt_state.cursor > 0)
+			{
+				--g_prompt_state.cursor;
+				if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
+				{
+					CONSOLE_SCREEN_BUFFER_INFO info{};
+					if (GetConsoleScreenBufferInfo(handle, &info))
+					{
+						const COORD cursor{
+							static_cast<SHORT>(std::strlen(k_prompt_name) + std::strlen(k_prompt_suffix) + g_prompt_state.cursor),
+							g_prompt_state.row >= 0 ? g_prompt_state.row : info.dwCursorPosition.Y
+						};
+						SetConsoleCursorPosition(handle, cursor);
+					}
+				}
+			}
+			return false;
+
+		case VK_RIGHT:
+			if (g_prompt_state.cursor < g_prompt_state.buffer.size())
+			{
+				++g_prompt_state.cursor;
+				if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
+				{
+					CONSOLE_SCREEN_BUFFER_INFO info{};
+					if (GetConsoleScreenBufferInfo(handle, &info))
+					{
+						const COORD cursor{
+							static_cast<SHORT>(std::strlen(k_prompt_name) + std::strlen(k_prompt_suffix) + g_prompt_state.cursor),
+							g_prompt_state.row >= 0 ? g_prompt_state.row : info.dwCursorPosition.Y
+						};
+						SetConsoleCursorPosition(handle, cursor);
+					}
+				}
+			}
+			return false;
+
+		case VK_RETURN:
+			completed_line = g_prompt_state.buffer;
+			if (!g_prompt_state.buffer.empty())
+			{
+				if (g_prompt_state.history_index >= 0
+					&& g_prompt_state.history_index < static_cast<std::int32_t>(g_prompt_state.history.size()))
+				{
+					const auto itr = g_prompt_state.history.begin() + g_prompt_state.history_index;
+					if (*itr == g_prompt_state.buffer)
+					{
+						g_prompt_state.history.erase(itr);
+					}
+				}
+
+				g_prompt_state.history.push_front(g_prompt_state.buffer);
+				if (g_prompt_state.history.size() > 10)
+				{
+					g_prompt_state.history.erase(g_prompt_state.history.begin() + 10, g_prompt_state.history.end());
+				}
+			}
+
+			commit_shell_input_line(completed_line);
+			return true;
+
+		case VK_BACK:
+			if (g_prompt_state.cursor > 0 && !g_prompt_state.buffer.empty())
+			{
+				g_prompt_state.buffer.erase(g_prompt_state.cursor - 1, 1);
+				--g_prompt_state.cursor;
+				g_prompt_state.history_index = -1;
+				render_shell_input_line(g_prompt_state.buffer, g_prompt_state.buffer.size());
+			}
+			return false;
+
+		case VK_ESCAPE:
+			if (!g_prompt_state.buffer.empty())
+			{
+				g_prompt_state.buffer.clear();
+				g_prompt_state.cursor = 0;
+				g_prompt_state.history_index = -1;
+				render_shell_input_line(g_prompt_state.buffer, g_prompt_state.buffer.size());
+			}
+			return false;
+
+		default:
+		{
+			const auto c = record.Event.KeyEvent.uChar.AsciiChar;
+			if (!c || static_cast<unsigned char>(c) < 32)
+			{
+				return false;
+			}
+
+			if (g_prompt_state.buffer.size() >= get_max_input_length(handle))
+			{
+				return false;
+			}
+
+			g_prompt_state.buffer.insert(g_prompt_state.cursor, 1, c);
+			++g_prompt_state.cursor;
+			g_prompt_state.history_index = -1;
+			render_shell_input_line(g_prompt_state.buffer, g_prompt_state.buffer.size());
+			return false;
+		}
+		}
 	}
 
 	void clear_console_display()
 	{
 		std::lock_guard _(runtime::get_output_mutex());
 		g_prompt_state.active = false;
-		g_prompt_state.line.clear();
-		g_prompt_state.previous_length = 0;
+		g_prompt_state.buffer.clear();
+		g_prompt_state.cursor = 0;
+		g_prompt_state.history_index = -1;
+		g_prompt_state.row = -1;
 
 		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
 		if (handle == INVALID_HANDLE_VALUE || handle == nullptr)

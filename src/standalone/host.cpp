@@ -59,15 +59,15 @@ namespace
 
 	using standalone::shell::append_input_log_line;
 	using standalone::shell::append_log_line;
+	using standalone::shell::begin_shell_input;
 	using standalone::shell::clear_console_display;
-	using standalone::shell::commit_shell_input_line;
 	using standalone::shell::flush_shell_input_buffer;
+	using standalone::shell::handle_shell_input_record;
 	using standalone::shell::host_patch_print;
 	using standalone::shell::host_print;
 	using standalone::shell::host_section_print;
 	using standalone::shell::make_section_banner;
 	using standalone::shell::make_host_section_line;
-	using standalone::shell::render_shell_input_line;
 	using standalone::shell::write_console_line;
 	using standalone::shell::write_shell_line;
 	bool should_suppress_engine_error(const std::string& message);
@@ -240,9 +240,8 @@ namespace
 		line.clear();
 		engine_terminated = false;
 		const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
-		size_t previous_length = 0;
 
-		render_shell_input_line(line, previous_length);
+		begin_shell_input();
 
 		while (true)
 		{
@@ -275,59 +274,9 @@ namespace
 				continue;
 			}
 
-			if (record.EventType == WINDOW_BUFFER_SIZE_EVENT)
+			if (handle_shell_input_record(record, line))
 			{
-				render_shell_input_line(line, previous_length);
-				continue;
-			}
-
-			if (record.EventType != KEY_EVENT || !record.Event.KeyEvent.bKeyDown)
-			{
-				continue;
-			}
-
-			switch (record.Event.KeyEvent.wVirtualKeyCode)
-			{
-			case VK_RETURN:
-				commit_shell_input_line(line);
 				return true;
-
-			case VK_BACK:
-				if (!line.empty())
-				{
-					previous_length = std::max(previous_length, line.size());
-					line.pop_back();
-					render_shell_input_line(line, previous_length);
-				}
-				break;
-
-			case VK_ESCAPE:
-				if (!line.empty())
-				{
-					previous_length = std::max(previous_length, line.size());
-					line.clear();
-					render_shell_input_line(line, previous_length);
-				}
-				break;
-
-			default:
-			{
-				const auto c = record.Event.KeyEvent.uChar.AsciiChar;
-				if (!c || static_cast<unsigned char>(c) < 32)
-				{
-					break;
-				}
-
-				if (line.size() >= 510)
-				{
-					break;
-				}
-
-				line.push_back(c);
-				previous_length = std::max(previous_length, line.size());
-				render_shell_input_line(line, previous_length);
-				break;
-			}
 			}
 		}
 	}

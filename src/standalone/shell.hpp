@@ -21,6 +21,8 @@ namespace standalone::shell
 	void render_shell_prompt();
 	void commit_shell_input_line(const std::string& line);
 	void render_shell_input_line(const std::string& line, size_t previous_length);
+	void begin_shell_input();
+	bool handle_shell_input_record(const INPUT_RECORD& record, std::string& completed_line);
 	void clear_console_display();
 	void settle_shell_io();
 	void flush_shell_input_buffer();
