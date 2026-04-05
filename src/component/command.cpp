@@ -2,7 +2,7 @@
 #include "loader/component_loader.hpp"
 
 #include "command.hpp"
-#include "../game/symbols.hpp"
+#include "console.hpp"
 #include "scheduler.hpp"
 
 #include <utils/memory.hpp>
@@ -139,18 +139,18 @@ namespace command
 				add("help", []()
 				{
 					const auto entries = get_help_entries();
-					game::Com_Printf(0, "available commands:\n");
+					console::info("available commands:\n");
 
 					for (const auto& entry : entries)
 					{
-						game::Com_Printf(0, " - %s\n", entry.name.c_str());
+						console::info(" - %s\n", entry.name.c_str());
 						if (!entry.description.empty())
 						{
-							game::Com_Printf(0, "   %s\n", entry.description.c_str());
+							console::info("   %s\n", entry.description.c_str());
 						}
 						if (!entry.example.empty())
 						{
-							game::Com_Printf(0, "   example: %s\n", entry.example.c_str());
+							console::info("   example: %s\n", entry.example.c_str());
 						}
 					}
 				});
@@ -158,7 +158,7 @@ namespace command
 
 				add("hello", []()
 				{
-					game::Com_Printf(0, "hello from qos-xport!\n");
+					console::info("hello from qos-xport!\n");
 				});
 				set_help("hello", "Test the standalone command shell.", "hello");
 			}, scheduler::main);

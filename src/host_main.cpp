@@ -99,6 +99,61 @@ namespace
 		append_log_line("[host] type 'help' for a list of commands, or 'quit' to exit");
 	}
 
+	bool process_shell_input_line(const std::string& line)
+	{
+		if (line == "quit" || line == "exit")
+		{
+			return false;
+		}
+
+		if (!line.empty())
+		{
+			append_input_log_line(line);
+			command::execute(line);
+		}
+
+		return true;
+	}
+
+	bool run_shell_loop(HANDLE engine_thread = nullptr)
+	{
+		std::string line;
+		while (true)
+		{
+			if (engine_thread)
+			{
+				const auto engine_wait = WaitForSingleObject(engine_thread, 0);
+				if (engine_wait == WAIT_OBJECT_0)
+				{
+					DWORD exit_code = 0;
+					if (GetExitCodeThread(engine_thread, &exit_code))
+					{
+						host_print("engine thread exited with code " + std::to_string(exit_code));
+					}
+					return false;
+				}
+			}
+
+			if (!std::getline(std::cin, line))
+			{
+				if (std::cin.eof() || std::cin.fail())
+				{
+					std::cin.clear();
+					Sleep(50);
+					continue;
+				}
+
+				host_print("stdin closed unexpectedly");
+				return false;
+			}
+
+			if (!process_shell_input_line(line))
+			{
+				return true;
+			}
+		}
+	}
+
 	int handle_module_load_exception(_EXCEPTION_POINTERS* exception_info)
 	{
 		g_module_load_exception_code = exception_info && exception_info->ExceptionRecord
@@ -1089,30 +1144,7 @@ namespace
 		wait_for_debugger_if_requested("post-runtime");
 
 		print_init_complete_banner();
-
-		std::string line;
-		while (true)
-		{
-			if (!std::getline(std::cin, line))
-			{
-				if (std::cin.eof())
-				{
-					break;
-				}
-
-				std::cin.clear();
-				Sleep(50);
-				continue;
-			}
-
-			if (line == "quit" || line == "exit")
-			{
-				break;
-			}
-
-			append_input_log_line(line);
-			command::execute(line);
-		}
+		run_shell_loop();
 
 		runtime::shutdown();
 		return 0;
@@ -1273,45 +1305,7 @@ namespace
 		{
 			print_init_complete_banner();
 		}
-
-		std::string line;
-		while (true)
-		{
-			const auto engine_wait = WaitForSingleObject(thread, 0);
-			if (engine_wait == WAIT_OBJECT_0)
-			{
-				DWORD exit_code = 0;
-				if (GetExitCodeThread(thread, &exit_code))
-				{
-					host_print("engine thread exited with code " + std::to_string(exit_code));
-				}
-				break;
-			}
-
-			if (!std::getline(std::cin, line))
-			{
-				if (std::cin.eof() || std::cin.fail())
-				{
-					std::cin.clear();
-					Sleep(50);
-					continue;
-				}
-
-				host_print("stdin closed unexpectedly");
-				break;
-			}
-
-			if (line == "quit" || line == "exit")
-			{
-				break;
-			}
-
-			if (!line.empty())
-			{
-				append_input_log_line(line);
-				command::execute(line);
-			}
-		}
+		run_shell_loop(thread);
 
 		runtime::shutdown();
 		g_window_watch_kill = true;
