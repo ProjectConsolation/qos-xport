@@ -6,7 +6,6 @@
 #include "../runtime.hpp"
 #include "scheduler.hpp"
 
-#include <iostream>
 #include <utils/memory.hpp>
 #include <utils/string.hpp>
 
@@ -69,10 +68,31 @@ namespace command
 
 			std::lock_guard _(runtime::get_output_mutex());
 
-			std::cout << line << "\n";
-			std::cout.flush();
+			const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
+			if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
+			{
+				DWORD mode = 0;
+				if (GetConsoleMode(handle, &mode))
+				{
+					const auto with_newline = line + "\r\n";
+					DWORD written = 0;
+					WriteConsoleA(handle, with_newline.data(), static_cast<DWORD>(with_newline.size()), &written, nullptr);
+				}
+				else
+				{
+					std::fwrite(line.data(), 1, line.size(), stdout);
+					std::fwrite("\n", 1, 1, stdout);
+					std::fflush(stdout);
+				}
+			}
+			else
+			{
+				std::fwrite(line.data(), 1, line.size(), stdout);
+				std::fwrite("\n", 1, 1, stdout);
+				std::fflush(stdout);
+			}
 
-			append_standalone_log_line("[shell] " + line);
+			append_standalone_log_line(line);
 		}
 
 		void main_handler()

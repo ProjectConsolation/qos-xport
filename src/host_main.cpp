@@ -57,9 +57,11 @@ namespace
 	void append_input_log_line(const std::string& line);
 	void host_print(const std::string& message);
 	void write_console_line(const std::string& line);
-	void write_shell_prompt();
 	void write_shell_line(const std::string& line);
 	void clear_console_display();
+	void settle_shell_io();
+	void render_shell_input_line(const std::string& line, size_t previous_length);
+	void flush_shell_input_buffer();
 	void host_patch_print(const std::string& message);
 	void host_section_print(const std::string& message);
 	bool should_suppress_engine_error(const std::string& message);
@@ -103,6 +105,22 @@ namespace
 		write_shell_line("[QoS-xport] type 'help' for a list of commands, or 'quit' to exit");
 		append_log_line("[host] =========== qos-xport initialization complete =============");
 		append_log_line("[host] type 'help' for a list of commands, or 'quit' to exit");
+
+		flush_shell_input_buffer();
+	}
+
+	void settle_shell_io()
+	{
+		Sleep(35);
+	}
+
+	void flush_shell_input_buffer()
+	{
+		if (const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
+			input_handle != INVALID_HANDLE_VALUE && input_handle != nullptr)
+		{
+			FlushConsoleInputBuffer(input_handle);
+		}
 	}
 
 	bool process_shell_input_line(const std::string& line)
@@ -131,12 +149,64 @@ namespace
 		return true;
 	}
 
-	bool read_shell_input_line(std::string& line)
+	bool read_shell_input_line(std::string& line, HANDLE engine_thread, bool& engine_terminated)
 	{
 		line.clear();
+		engine_terminated = false;
 
-		write_shell_prompt();
-		return static_cast<bool>(std::getline(std::cin, line));
+		settle_shell_io();
+		render_shell_input_line(line, 0);
+
+		size_t previous_length = 0;
+		while (true)
+		{
+			if (engine_thread)
+			{
+				const auto engine_wait = WaitForSingleObject(engine_thread, 0);
+				if (engine_wait == WAIT_OBJECT_0)
+				{
+					engine_terminated = true;
+					return false;
+				}
+			}
+
+			if (!_kbhit())
+			{
+				Sleep(10);
+				continue;
+			}
+
+			auto key = _getch();
+			if (key == 0 || key == 224)
+			{
+				(void)_getch();
+				continue;
+			}
+
+			if (key == '\r')
+			{
+				write_shell_line("");
+				return true;
+			}
+
+			if (key == '\b')
+			{
+				if (!line.empty())
+				{
+					previous_length = line.size();
+					line.pop_back();
+					render_shell_input_line(line, previous_length);
+				}
+				continue;
+			}
+
+			if (key >= 32 && key < 127)
+			{
+				previous_length = line.size();
+				line.push_back(static_cast<char>(key));
+				render_shell_input_line(line, previous_length);
+			}
+		}
 	}
 
 	bool run_shell_loop(HANDLE engine_thread = nullptr)
@@ -158,8 +228,19 @@ namespace
 				}
 			}
 
-			if (!read_shell_input_line(line))
+			bool engine_terminated = false;
+			if (!read_shell_input_line(line, engine_thread, engine_terminated))
 			{
+				if (engine_terminated)
+				{
+					DWORD exit_code = 0;
+					if (engine_thread && GetExitCodeThread(engine_thread, &exit_code))
+					{
+						host_print("engine thread exited with code " + std::to_string(exit_code));
+					}
+					return false;
+				}
+
 				if (std::cin.eof() || std::cin.fail())
 				{
 					std::cin.clear();
@@ -175,6 +256,8 @@ namespace
 			{
 				return true;
 			}
+
+			settle_shell_io();
 		}
 	}
 
@@ -508,7 +591,29 @@ namespace
 		append_log_line(message);
 	}
 
-	void write_shell_prompt()
+	void write_shell_line(const std::string& line)
+	{
+		std::lock_guard _(runtime::get_output_mutex());
+
+		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
+		if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
+		{
+			DWORD mode = 0;
+			if (GetConsoleMode(handle, &mode))
+			{
+				const auto with_newline = line + "\r\n";
+				DWORD written = 0;
+				WriteConsoleA(handle, with_newline.data(), static_cast<DWORD>(with_newline.size()), &written, nullptr);
+				return;
+			}
+		}
+
+		std::fwrite(line.data(), 1, line.size(), stdout);
+		std::fwrite("\n", 1, 1, stdout);
+		std::fflush(stdout);
+	}
+
+	void render_shell_input_line(const std::string& line, size_t previous_length)
 	{
 		std::lock_guard _(runtime::get_output_mutex());
 
@@ -525,29 +630,47 @@ namespace
 					original_attributes = info.wAttributes;
 				}
 
+				const auto row = info.dwCursorPosition.Y;
+				DWORD written = 0;
+				WriteConsoleA(handle, "\r", 1, &written, nullptr);
+
 				constexpr auto prompt_name = "QoS-xport";
 				constexpr auto prompt_suffix = ": ";
-				DWORD written = 0;
 				SetConsoleTextAttribute(handle, static_cast<WORD>(FOREGROUND_RED));
-				std::cout << prompt_name;
-				std::cout.flush();
+				WriteConsoleA(handle, prompt_name, static_cast<DWORD>(std::strlen(prompt_name)), &written, nullptr);
 				SetConsoleTextAttribute(handle, static_cast<WORD>(FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE));
-				std::cout << prompt_suffix;
-				std::cout.flush();
+				WriteConsoleA(handle, prompt_suffix, static_cast<DWORD>(std::strlen(prompt_suffix)), &written, nullptr);
 				SetConsoleTextAttribute(handle, original_attributes);
+
+				if (!line.empty())
+				{
+					WriteConsoleA(handle, line.data(), static_cast<DWORD>(line.size()), &written, nullptr);
+				}
+
+				if (previous_length > line.size())
+				{
+					const std::string padding(previous_length - line.size(), ' ');
+					WriteConsoleA(handle, padding.data(), static_cast<DWORD>(padding.size()), &written, nullptr);
+				}
+
+				const COORD cursor{
+					static_cast<SHORT>(std::strlen(prompt_name) + std::strlen(prompt_suffix) + line.size()),
+					row
+				};
+				SetConsoleCursorPosition(handle, cursor);
 				return;
 			}
 		}
 
+		std::fwrite("\r", 1, 1, stdout);
 		std::fwrite(k_shell_prompt, 1, std::strlen(k_shell_prompt), stdout);
+		std::fwrite(line.data(), 1, line.size(), stdout);
+		if (previous_length > line.size())
+		{
+			const std::string padding(previous_length - line.size(), ' ');
+			std::fwrite(padding.data(), 1, padding.size(), stdout);
+		}
 		std::fflush(stdout);
-	}
-
-	void write_shell_line(const std::string& line)
-	{
-		std::lock_guard _(runtime::get_output_mutex());
-		std::cout << line << "\n";
-		std::cout.flush();
 	}
 
 	void clear_console_display()
