@@ -3,6 +3,7 @@
 
 #include "command.hpp"
 #include "console.hpp"
+#include "standalone/shell.hpp"
 #include "../runtime.hpp"
 #include "scheduler.hpp"
 
@@ -28,33 +29,8 @@ namespace command
 				return;
 			}
 
-			std::lock_guard _(runtime::get_output_mutex());
-
-			const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
-			if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
-			{
-				DWORD mode = 0;
-				if (GetConsoleMode(handle, &mode))
-				{
-					const auto with_newline = line + "\r\n";
-					DWORD written = 0;
-					WriteConsoleA(handle, with_newline.data(), static_cast<DWORD>(with_newline.size()), &written, nullptr);
-				}
-				else
-				{
-					std::fwrite(line.data(), 1, line.size(), stdout);
-					std::fwrite("\n", 1, 1, stdout);
-					std::fflush(stdout);
-				}
-			}
-			else
-			{
-				std::fwrite(line.data(), 1, line.size(), stdout);
-				std::fwrite("\n", 1, 1, stdout);
-				std::fflush(stdout);
-			}
-
-			runtime::append_log_line(line);
+			standalone::shell::write_shell_line(line);
+			standalone::shell::append_log_line(line);
 		}
 
 		void main_handler()
