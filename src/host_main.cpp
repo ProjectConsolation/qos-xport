@@ -403,6 +403,11 @@ namespace
 		return {buffer, static_cast<size_t>(count)};
 	}
 
+	void append_input_log_line(const std::string& line)
+	{
+		append_log_line("[input] " + line);
+	}
+
 	void host_print(const std::string& message)
 	{
 		std::lock_guard _(runtime::get_output_mutex());
@@ -1105,10 +1110,8 @@ namespace
 				break;
 			}
 
-			if (!command::execute_local(line))
-			{
-				host_print("engine command dispatch is unavailable in minimal bootstrap mode");
-			}
+			append_input_log_line(line);
+			command::execute(line);
 		}
 
 		runtime::shutdown();
@@ -1303,14 +1306,10 @@ namespace
 				break;
 			}
 
-			if (!line.empty() && command::execute_local(line))
-			{
-				continue;
-			}
-
 			if (!line.empty())
 			{
-				game::Cbuf_AddText(0, (line + "\n").c_str());
+				append_input_log_line(line);
+				command::execute(line);
 			}
 		}
 
