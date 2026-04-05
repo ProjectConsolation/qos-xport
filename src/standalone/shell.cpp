@@ -4,8 +4,10 @@
 #include "standalone/runtime.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <optional>
+#include <string_view>
 
 namespace standalone::shell
 {
@@ -26,6 +28,8 @@ namespace standalone::shell
 		constexpr WORD k_color_debug_minor = FOREGROUND_RED | FOREGROUND_GREEN;
 		constexpr WORD k_color_engine_major = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
 		constexpr WORD k_color_engine_minor = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+		constexpr WORD k_color_error = FOREGROUND_RED | FOREGROUND_INTENSITY;
+		constexpr WORD k_color_success = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
 		constexpr auto k_shell_prompt = "QoS-xport: ";
 		constexpr auto k_prompt_name = "QoS-xport";
 		constexpr auto k_prompt_suffix = ": ";
@@ -34,6 +38,37 @@ namespace standalone::shell
 		{
 			WORD major;
 			WORD minor;
+			WORD body;
+		};
+
+		struct tag_rule
+		{
+			std::string_view category;
+			tag_palette palette;
+		};
+
+		struct tag_variant_rule
+		{
+			std::string_view tag;
+			WORD color;
+		};
+
+		constexpr std::array k_tag_rules =
+		{
+			tag_rule{ "qos-xport", { k_color_qos_major, k_color_qos_minor, k_color_white } },
+			tag_rule{ "host", { k_color_host_major, k_color_host_minor, k_color_host_major } },
+			tag_rule{ "patch", { k_color_patch_major, k_color_patch_minor, k_color_patch_major } },
+			tag_rule{ "component_loader", { k_color_component_major, k_color_component_minor, k_color_component_major } },
+			tag_rule{ "runtime", { k_color_runtime_major, k_color_runtime_minor, k_color_runtime_major } },
+			tag_rule{ "debug", { k_color_debug_major, k_color_debug_minor, k_color_debug_major } },
+			tag_rule{ "engine", { k_color_engine_major, k_color_engine_minor, k_color_engine_major } },
+		};
+
+		constexpr std::array k_tag_variant_rules =
+		{
+			tag_variant_rule{ "engine:error", k_color_error },
+			tag_variant_rule{ "engine:init", FOREGROUND_GREEN },
+			tag_variant_rule{ "engine:warn", k_color_debug_major },
 		};
 
 		std::string lower_copy(std::string value)
@@ -64,33 +99,12 @@ namespace standalone::shell
 
 		std::optional<tag_palette> get_family_palette(const std::string& family)
 		{
-			if (family == "qos-xport")
+			for (const auto& rule : k_tag_rules)
 			{
-				return tag_palette{ k_color_qos_major, k_color_qos_minor };
-			}
-			if (family == "host")
-			{
-				return tag_palette{ k_color_host_major, k_color_host_minor };
-			}
-			if (family == "patch")
-			{
-				return tag_palette{ k_color_patch_major, k_color_patch_minor };
-			}
-			if (family == "component_loader")
-			{
-				return tag_palette{ k_color_component_major, k_color_component_minor };
-			}
-			if (family == "runtime")
-			{
-				return tag_palette{ k_color_runtime_major, k_color_runtime_minor };
-			}
-			if (family == "debug")
-			{
-				return tag_palette{ k_color_debug_major, k_color_debug_minor };
-			}
-			if (family == "engine")
-			{
-				return tag_palette{ k_color_engine_major, k_color_engine_minor };
+				if (rule.category == family)
+				{
+					return rule.palette;
+				}
 			}
 
 			return std::nullopt;
@@ -99,17 +113,12 @@ namespace standalone::shell
 		WORD get_tag_color(const std::string& tag, const WORD original_attributes)
 		{
 			const auto lowered_tag = lower_copy(tag);
-			if (lowered_tag == "engine:error")
+			for (const auto& rule : k_tag_variant_rules)
 			{
-				return FOREGROUND_RED | FOREGROUND_INTENSITY;
-			}
-			if (lowered_tag == "engine:init")
-			{
-				return FOREGROUND_GREEN;
-			}
-			if (lowered_tag == "engine:warn")
-			{
-				return k_color_debug_major;
+				if (rule.tag == lowered_tag)
+				{
+					return rule.color;
+				}
 			}
 
 			const auto separator = lowered_tag.find(':');
@@ -182,16 +191,16 @@ namespace standalone::shell
 			const auto quote_end = quote_start == std::string::npos ? std::string::npos : body.find('\'', quote_start + 1);
 			WORD body_color = k_color_white;
 
-			if (const auto palette = get_family_palette(family); palette.has_value() && family != "qos-xport")
+			if (const auto palette = get_family_palette(family); palette.has_value())
 			{
-				body_color = palette->major;
+				body_color = palette->body;
 			}
 
 			if (lowered_body.find("all patches applied") != std::string::npos
 				|| lowered_body.find(" succeeded") != std::string::npos
 				|| lowered_body.find("successfully") != std::string::npos)
 			{
-				body_color = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+				body_color = k_color_success;
 			}
 			else if (lowered_body.find("warning") != std::string::npos)
 			{
@@ -200,7 +209,7 @@ namespace standalone::shell
 			else if (lowered_body.find("error") != std::string::npos
 				|| lowered_body.find("failed") != std::string::npos)
 			{
-				body_color = FOREGROUND_RED | FOREGROUND_INTENSITY;
+				body_color = k_color_error;
 			}
 
 			set_console_color(handle, k_color_white);
@@ -228,12 +237,12 @@ namespace standalone::shell
 				if (lowered_body.find("loaded ") != std::string::npos
 					|| lowered_body.find("succeeded") != std::string::npos)
 				{
-					quoted_color = FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+					quoted_color = k_color_success;
 				}
 				else if (lowered_body.find("failed") != std::string::npos
 					|| lowered_body.find("error") != std::string::npos)
 				{
-					quoted_color = FOREGROUND_RED | FOREGROUND_INTENSITY;
+					quoted_color = k_color_error;
 				}
 
 				set_console_color(handle, body_color);
