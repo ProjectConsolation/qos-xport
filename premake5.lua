@@ -198,6 +198,7 @@ workspace "qos-exp"
 
 		removefiles
 		{
+			"./src/xport.def",
 			"./src/main.cpp",
 			"./src/sdllp.cpp",
 		}

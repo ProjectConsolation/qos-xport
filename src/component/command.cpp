@@ -136,6 +136,11 @@ namespace command
 		};
 	}
 
+	void print_line(const std::string& line)
+	{
+		print_command_line(line);
+	}
+
 	void execute(std::string command)
 	{
 		command += "\n";
@@ -227,18 +232,18 @@ namespace command
 				add("help", []()
 				{
 					const auto entries = get_help_entries();
-					print_command_line("available commands:");
+					print_line("available commands:");
 
 					for (const auto& entry : entries)
 					{
-						print_command_line(" - " + entry.name);
+						print_line(" - " + entry.name);
 						if (!entry.description.empty())
 						{
-							print_command_line("   " + entry.description);
+							print_line("   " + entry.description);
 						}
 						if (!entry.example.empty())
 						{
-							print_command_line("   example: " + entry.example);
+							print_line("   example: " + entry.example);
 						}
 					}
 				});
@@ -246,7 +251,7 @@ namespace command
 
 				add("hello", []()
 				{
-					print_command_line("hello from qos-xport!");
+					print_line("hello from qos-xport!");
 				});
 				set_help("hello", "Test the standalone command shell.", "hello");
 			}, scheduler::main);

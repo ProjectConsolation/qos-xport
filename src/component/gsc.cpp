@@ -143,23 +143,19 @@ namespace gsc
 				return true;
 			}
 
-			/*
 			const auto* name_str = name.data();
-			if (game::DB_XAssetExists(game::ASSET_TYPE_RAWFILE, name_str) &&
+			const auto asset = game::DB_FindXAssetHeader_Internal(game::ASSET_TYPE_RAWFILE, name_str, false);
+			if (asset.rawfile && asset.rawfile->buffer && asset.rawfile->len > 0 &&
 				!game::DB_IsXAssetDefault(game::ASSET_TYPE_RAWFILE, name_str))
 			{
-				const auto asset = game::DB_FindXAssetHeader(game::ASSET_TYPE_RAWFILE, name_str, false);
-				const auto len = game::DB_GetRawFileLen(asset.rawfile);
-				data->resize(len);
-				game::DB_GetRawBuffer(asset.rawfile, data->data(), len);
-				if (len > 0)
+				data->assign(asset.rawfile->buffer, asset.rawfile->len);
+				if (!data->empty() && data->back() == '\0')
 				{
 					data->pop_back();
 				}
 
 				return true;
 			}
-			*/
 
 			return false;
 		}

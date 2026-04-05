@@ -30,45 +30,45 @@ namespace rawfile
 		}
 	}
 
-		class component final : public component_interface
+	class component final : public component_interface
+	{
+	public:
+		bool is_supported() override
 		{
-		public:
-			bool is_supported() override
-			{
-				return false;
-			}
+			return true;
+		}
 
 		void post_load() override
 		{
-			if (runtime::is_standalone_xport_mode())
-			{
-				return;
-			}
-
 			scheduler::once([&]()
 			{
 				command::add("dumprawfile", [](const command::params& params)
 				{
 					if (params.size() < 2)
 					{
-						console::info("USAGE: dumprawfile <name>\n");
+						command::print_line("USAGE: dumprawfile <name>");
+						command::print_line("USAGE: dumprawfile *");
 						return;
 					}
 
 					const auto name = params[1];
 
-					auto header = game::DB_FindXAssetHeader(game::qos::ASSET_TYPE_RAWFILE, name);
-					if (!header.rawfile)
+					if (std::string{name} == "*")
 					{
-						console::error("dumprawfile failed on '%s'\n", name);
+						const auto dumped = assethandler::dump_all_assets_of_type(game::qos::ASSET_TYPE_RAWFILE);
+						command::print_line(std::string("dumped ") + std::to_string(dumped) + " rawfile asset(s)");
 						return;
 					}
 
-					auto converted = rawfile::convert(header.rawfile);
-					map_dumper::api->write(game::iw4::ASSET_TYPE_RAWFILE, converted);
+					if (!assethandler::dump_asset_by_name(game::qos::ASSET_TYPE_RAWFILE, name))
+					{
+						command::print_line(std::string("dumprawfile failed on '") + name + "'");
+						return;
+					}
 
-					console::info("dumped '%s' for IW4\n", name);
+					command::print_line(std::string("dumped '") + name + "' for IW4");
 				});
+				command::set_help("dumprawfile", "Dump one loaded rawfile asset, or '*' to dump all loaded rawfiles.", "dumprawfile maps/mp/mp_backlot.gsc");
 			}, scheduler::main);
 		}
 
