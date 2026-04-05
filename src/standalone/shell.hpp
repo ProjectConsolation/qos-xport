@@ -6,6 +6,9 @@
 namespace standalone::shell
 {
 	const char* prompt_text();
+	void capture_console_handles();
+	HANDLE get_console_output_handle();
+	HANDLE get_console_input_handle();
 
 	void append_log_line(const std::string& line);
 	void append_input_log_line(const std::string& line);

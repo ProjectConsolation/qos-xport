@@ -60,8 +60,10 @@ namespace
 	using standalone::shell::append_input_log_line;
 	using standalone::shell::append_log_line;
 	using standalone::shell::begin_shell_input;
+	using standalone::shell::capture_console_handles;
 	using standalone::shell::clear_console_display;
 	using standalone::shell::flush_shell_input_buffer;
+	using standalone::shell::get_console_input_handle;
 	using standalone::shell::handle_shell_input_record;
 	using standalone::shell::host_patch_print;
 	using standalone::shell::host_print;
@@ -115,34 +117,30 @@ namespace
 
 	void activate_shell_input_mode()
 	{
-		const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
+		const auto input_handle = get_console_input_handle();
 		if (input_handle == INVALID_HANDLE_VALUE || input_handle == nullptr)
 		{
 			return;
 		}
-
-		DWORD mode = 0;
-		if (!GetConsoleMode(input_handle, &mode))
-		{
-			return;
-		}
-
 		if (!g_shell_input_mode_active)
 		{
-			g_original_shell_input_mode = mode;
-			g_shell_input_mode_active = true;
+			DWORD mode = 0;
+			if (GetConsoleMode(input_handle, &mode))
+			{
+				g_original_shell_input_mode = mode;
+				g_shell_input_mode_active = true;
+
+				DWORD shell_mode = mode;
+				shell_mode |= ENABLE_EXTENDED_FLAGS;
+				shell_mode |= ENABLE_PROCESSED_INPUT;
+				shell_mode &= ~ENABLE_ECHO_INPUT;
+				shell_mode &= ~ENABLE_LINE_INPUT;
+				shell_mode &= ~ENABLE_MOUSE_INPUT;
+				shell_mode &= ~ENABLE_QUICK_EDIT_MODE;
+
+				SetConsoleMode(input_handle, shell_mode);
+			}
 		}
-
-		DWORD shell_mode = mode;
-		shell_mode |= ENABLE_EXTENDED_FLAGS;
-		shell_mode |= ENABLE_PROCESSED_INPUT;
-		shell_mode &= ~ENABLE_ECHO_INPUT;
-		shell_mode &= ~ENABLE_LINE_INPUT;
-		shell_mode &= ~ENABLE_MOUSE_INPUT;
-		shell_mode &= ~ENABLE_QUICK_EDIT_MODE;
-
-		SetConsoleMode(input_handle, shell_mode);
-		FlushConsoleInputBuffer(input_handle);
 	}
 
 	void restore_shell_input_mode()
@@ -152,7 +150,7 @@ namespace
 			return;
 		}
 
-		const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
+		const auto input_handle = get_console_input_handle();
 		if (input_handle != INVALID_HANDLE_VALUE && input_handle != nullptr)
 		{
 			SetConsoleMode(input_handle, g_original_shell_input_mode);
@@ -163,7 +161,7 @@ namespace
 
 	void activate_debug_wait_input_mode()
 	{
-		const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
+		const auto input_handle = get_console_input_handle();
 		if (input_handle == INVALID_HANDLE_VALUE || input_handle == nullptr)
 		{
 			return;
@@ -200,7 +198,7 @@ namespace
 			return;
 		}
 
-		const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
+		const auto input_handle = get_console_input_handle();
 		if (input_handle != INVALID_HANDLE_VALUE && input_handle != nullptr)
 		{
 			SetConsoleMode(input_handle, g_original_debug_wait_input_mode);
@@ -239,7 +237,7 @@ namespace
 	{
 		line.clear();
 		engine_terminated = false;
-		const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
+		const auto input_handle = get_console_input_handle();
 
 		begin_shell_input();
 
@@ -849,7 +847,7 @@ namespace
 			restore_debug_wait_input_mode();
 		});
 
-		const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
+		const auto input_handle = get_console_input_handle();
 		while (!IsDebuggerPresent())
 		{
 			SetConsoleTitleA(build_info::get_window_title().c_str());
@@ -1078,6 +1076,7 @@ namespace
 		_set_invalid_parameter_handler(host_invalid_parameter_handler);
 		SetUnhandledExceptionFilter(host_exception_filter);
 		SetConsoleTitleA(build_info::get_window_title().c_str());
+		capture_console_handles();
 
 		host_print("========== qos-xport initializing ==========");
 		host_print("loading 'jb_mp_s.dll' ...");
