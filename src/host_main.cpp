@@ -87,6 +87,18 @@ namespace
 		return buffer;
 	}
 
+	void print_init_complete_banner()
+	{
+		std::lock_guard _(runtime::get_output_mutex());
+		write_console_line("");
+		write_console_line("");
+		write_console_line("");
+		write_console_line("[QoS-xport] =========== initialization complete =============");
+		write_console_line("[QoS-xport] type 'help' for a list of commands, or 'quit' to exit");
+		append_log_line("[host] initialization complete");
+		append_log_line("[host] type 'help' for a list of commands, or 'quit' to exit");
+	}
+
 	int handle_module_load_exception(_EXCEPTION_POINTERS* exception_info)
 	{
 		g_module_load_exception_code = exception_info && exception_info->ExceptionRecord
@@ -830,8 +842,7 @@ namespace
 	int fail_and_wait(const std::string& message)
 	{
 		host_print(message);
-		std::printf("Press Enter to close...\n");
-		std::fflush(stdout);
+		host_print("press Enter to close");
 		std::getchar();
 		return 1;
 	}
@@ -1072,13 +1083,7 @@ namespace
 
 		wait_for_debugger_if_requested("post-runtime");
 
-		write_console_line("");
-		write_console_line("");
-		write_console_line("");
-		write_console_line("[QoS-xport] =========== initialization complete =============");
-		write_console_line("[QoS-xport] type 'help' for a list of commands, or 'quit' to exit");
-		append_log_line("[host] initialization complete");
-		append_log_line("[host] type 'help' for a list of commands, or 'quit' to exit");
+		print_init_complete_banner();
 
 		std::string line;
 		while (true)
@@ -1263,13 +1268,7 @@ namespace
 
 		if (g_bootstrap_zones_ready.load() && !g_engine_error_seen.load() && !g_init_popup_seen.load())
 		{
-			write_console_line("");
-			write_console_line("");
-			write_console_line("");
-			write_console_line("[QoS-xport] =========== initialization complete =============");
-			write_console_line("[QoS-xport] type 'help' for a list of commands, or 'quit' to exit");
-			append_log_line("[host] initialization complete");
-			append_log_line("[host] type 'help' for a list of commands, or 'quit' to exit");
+			print_init_complete_banner();
 		}
 
 		std::string line;
