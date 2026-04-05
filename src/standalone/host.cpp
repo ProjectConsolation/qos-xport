@@ -54,6 +54,8 @@ namespace
 	std::thread g_window_watch_thread;
 	bool g_shell_input_mode_active = false;
 	DWORD g_original_shell_input_mode = 0;
+	bool g_debug_wait_input_mode_active = false;
+	DWORD g_original_debug_wait_input_mode = 0;
 
 	using standalone::shell::append_input_log_line;
 	using standalone::shell::append_log_line;
@@ -159,6 +161,54 @@ namespace
 		}
 
 		g_shell_input_mode_active = false;
+	}
+
+	void activate_debug_wait_input_mode()
+	{
+		const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
+		if (input_handle == INVALID_HANDLE_VALUE || input_handle == nullptr)
+		{
+			return;
+		}
+
+		DWORD mode = 0;
+		if (!GetConsoleMode(input_handle, &mode))
+		{
+			return;
+		}
+
+		if (!g_debug_wait_input_mode_active)
+		{
+			g_original_debug_wait_input_mode = mode;
+			g_debug_wait_input_mode_active = true;
+		}
+
+		DWORD wait_mode = mode;
+		wait_mode |= ENABLE_EXTENDED_FLAGS;
+		wait_mode |= ENABLE_PROCESSED_INPUT;
+		wait_mode &= ~ENABLE_ECHO_INPUT;
+		wait_mode &= ~ENABLE_LINE_INPUT;
+		wait_mode &= ~ENABLE_MOUSE_INPUT;
+		wait_mode &= ~ENABLE_QUICK_EDIT_MODE;
+
+		SetConsoleMode(input_handle, wait_mode);
+		FlushConsoleInputBuffer(input_handle);
+	}
+
+	void restore_debug_wait_input_mode()
+	{
+		if (!g_debug_wait_input_mode_active)
+		{
+			return;
+		}
+
+		const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
+		if (input_handle != INVALID_HANDLE_VALUE && input_handle != nullptr)
+		{
+			SetConsoleMode(input_handle, g_original_debug_wait_input_mode);
+		}
+
+		g_debug_wait_input_mode_active = false;
 	}
 
 	bool process_shell_input_line(const std::string& line)
@@ -816,19 +866,39 @@ namespace
 
 		const auto message = std::string("[debug:wait] attach debugger now, or click enter to continue without debugging (") + stage + ")";
 		host_section_print(message);
+		activate_debug_wait_input_mode();
+		const auto restore_debug_input = gsl::finally([]()
+		{
+			restore_debug_wait_input_mode();
+		});
+
+		const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
 		while (!IsDebuggerPresent())
 		{
 			SetConsoleTitleA(build_info::get_window_title().c_str());
-			if (_kbhit())
+			if (input_handle != INVALID_HANDLE_VALUE && input_handle != nullptr)
 			{
-				const auto key = _getch();
-				if (key == '\r')
+				const auto input_wait = WaitForSingleObject(input_handle, 100);
+				if (input_wait == WAIT_OBJECT_0)
 				{
-					host_section_print("[debug:wait] continuing without debugger");
-					return;
+					INPUT_RECORD record{};
+					DWORD event_count = 0;
+					if (ReadConsoleInputA(input_handle, &record, 1, &event_count) && event_count == 1)
+					{
+						if (record.EventType == KEY_EVENT
+							&& record.Event.KeyEvent.bKeyDown
+							&& record.Event.KeyEvent.wVirtualKeyCode == VK_RETURN)
+						{
+							host_section_print("[debug:wait] continuing without debugger");
+							return;
+						}
+					}
 				}
 			}
-			Sleep(100);
+			else
+			{
+				Sleep(100);
+			}
 		}
 
 		host_section_print(std::string("[debug:wait] debugger attached (") + stage + ")");

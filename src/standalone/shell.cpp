@@ -184,7 +184,7 @@ namespace standalone::shell
 
 			if (const auto palette = get_family_palette(family); palette.has_value() && family != "qos-xport")
 			{
-				body_color = separator == std::string::npos ? palette->minor : palette->minor;
+				body_color = palette->major;
 			}
 
 			if (lowered_body.find("all patches applied") != std::string::npos
