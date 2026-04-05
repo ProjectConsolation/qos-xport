@@ -155,9 +155,14 @@ workspace "qos-exp"
 
 		removefiles
 		{
-			"./src/launcher.cpp",
-			"./src/launcher.hpp",
-			"./src/host_main.cpp",
+			"./src/standalone/build_info.hpp",
+			"./src/standalone/host.cpp",
+			"./src/standalone/launcher.cpp",
+			"./src/standalone/launcher.hpp",
+			"./src/standalone/runtime.cpp",
+			"./src/standalone/runtime.hpp",
+			"./src/standalone/shell.cpp",
+			"./src/standalone/shell.hpp",
 			"./src/sdllp.cpp",
 		}
 
@@ -181,7 +186,7 @@ workspace "qos-exp"
 		kind "ConsoleApp"
 		language "C++"
 		targetname "QoS-xport"
-		linkoptions { '/MANIFESTUAC:"level=''requireAdministrator'' uiAccess=''false''"' }
+		linkoptions { "/MANIFESTUAC:\"level='requireAdministrator' uiAccess='false'\"" }
 
 		files
 		{
