@@ -68,29 +68,8 @@ namespace command
 
 			std::lock_guard _(runtime::get_output_mutex());
 
-			const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
-			if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
-			{
-				DWORD mode = 0;
-				if (GetConsoleMode(handle, &mode))
-				{
-					const auto with_newline = line + "\r\n";
-					DWORD written = 0;
-					WriteConsoleA(handle, with_newline.data(), static_cast<DWORD>(with_newline.size()), &written, nullptr);
-				}
-				else
-				{
-					std::fwrite(line.data(), 1, line.size(), stdout);
-					std::fwrite("\n", 1, 1, stdout);
-					std::fflush(stdout);
-				}
-			}
-			else
-			{
-				std::fwrite(line.data(), 1, line.size(), stdout);
-				std::fwrite("\n", 1, 1, stdout);
-				std::fflush(stdout);
-			}
+			std::cout << line << "\n";
+			std::cout.flush();
 
 			append_standalone_log_line("[shell] " + line);
 		}

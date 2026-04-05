@@ -57,6 +57,7 @@ namespace
 	void append_input_log_line(const std::string& line);
 	void host_print(const std::string& message);
 	void write_console_line(const std::string& line);
+	void write_shell_prompt();
 	void host_patch_print(const std::string& message);
 	void host_section_print(const std::string& message);
 	bool should_suppress_engine_error(const std::string& message);
@@ -88,6 +89,8 @@ namespace
 		return buffer;
 	}
 
+	constexpr auto k_shell_prompt = "QoS-xport: ";
+
 	void print_init_complete_banner()
 	{
 		std::lock_guard _(runtime::get_output_mutex());
@@ -96,7 +99,7 @@ namespace
 		write_console_line("");
 		write_console_line("[QoS-xport] =========== initialization complete =============");
 		write_console_line("[QoS-xport] type 'help' for a list of commands, or 'quit' to exit");
-		append_log_line("[host] initialization complete");
+		append_log_line("[host] =========== qos-xport initialization complete =============");
 		append_log_line("[host] type 'help' for a list of commands, or 'quit' to exit");
 	}
 
@@ -126,6 +129,14 @@ namespace
 		return true;
 	}
 
+	bool read_shell_input_line(std::string& line)
+	{
+		line.clear();
+
+		write_shell_prompt();
+		return static_cast<bool>(std::getline(std::cin, line));
+	}
+
 	bool run_shell_loop(HANDLE engine_thread = nullptr)
 	{
 		std::string line;
@@ -145,7 +156,7 @@ namespace
 				}
 			}
 
-			if (!std::getline(std::cin, line))
+			if (!read_shell_input_line(line))
 			{
 				if (std::cin.eof() || std::cin.fail())
 				{
@@ -471,7 +482,7 @@ namespace
 
 	void append_input_log_line(const std::string& line)
 	{
-		append_log_line("[input] " + line);
+		append_log_line(std::string(k_shell_prompt) + line);
 	}
 
 	void host_print(const std::string& message)
@@ -493,6 +504,41 @@ namespace
 		std::lock_guard _(runtime::get_output_mutex());
 		write_console_line(message);
 		append_log_line(message);
+	}
+
+	void write_shell_prompt()
+	{
+		std::lock_guard _(runtime::get_output_mutex());
+
+		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
+		if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
+		{
+			DWORD mode = 0;
+			if (GetConsoleMode(handle, &mode))
+			{
+				CONSOLE_SCREEN_BUFFER_INFO info{};
+				WORD original_attributes = FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+				if (GetConsoleScreenBufferInfo(handle, &info))
+				{
+					original_attributes = info.wAttributes;
+				}
+
+				constexpr auto prompt_name = "QoS-xport";
+				constexpr auto prompt_suffix = ": ";
+				DWORD written = 0;
+				SetConsoleTextAttribute(handle, static_cast<WORD>(FOREGROUND_RED));
+				std::cout << prompt_name;
+				std::cout.flush();
+				SetConsoleTextAttribute(handle, static_cast<WORD>(FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE));
+				std::cout << prompt_suffix;
+				std::cout.flush();
+				SetConsoleTextAttribute(handle, original_attributes);
+				return;
+			}
+		}
+
+		std::fwrite(k_shell_prompt, 1, std::strlen(k_shell_prompt), stdout);
+		std::fflush(stdout);
 	}
 
 	std::string make_host_section_line(const std::string& label, const std::string& message)

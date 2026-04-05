@@ -6,6 +6,7 @@
 #include "component/console.hpp"
 #include "component/map_dumper.hpp"
 #include "component/scheduler.hpp"
+#include "runtime.hpp"
 
 #include "game/game.hpp"
 #include "game/structs.IW4.hpp"
@@ -1021,6 +1022,12 @@ namespace menus
 			{
 				command::add("dumpmenu", [](const command::params& params)
 				{
+					if (runtime::is_standalone_xport_mode())
+					{
+						console::warn("dumpmenu is not available in minimal standalone bootstrap mode yet\n");
+						return;
+					}
+
 					if (params.size() < 2)
 					{
 						console::info("USAGE: dumpmenu <name>\n");
@@ -1047,6 +1054,12 @@ namespace menus
 
 				command::add("dumpmenulist", [](const command::params& params)
 					{
+						if (runtime::is_standalone_xport_mode())
+						{
+							console::warn("dumpmenulist is not available in minimal standalone bootstrap mode yet\n");
+							return;
+						}
+
 						if (params.size() < 2)
 						{
 							console::info("USAGE: dumpmenulist <name>\n");
