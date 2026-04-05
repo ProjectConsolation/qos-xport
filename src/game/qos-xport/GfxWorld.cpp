@@ -6,7 +6,7 @@
 #include "component/console.hpp"
 #include "component/map_dumper.hpp"
 #include "component/scheduler.hpp"
-#include "runtime.hpp"
+#include "standalone/runtime.hpp"
 
 //#include "component/assets/gfximage.hpp";
 
@@ -591,4 +591,6 @@ namespace gfxworld
 }
 
 REGISTER_COMPONENT(gfxworld::component)
+
+
 

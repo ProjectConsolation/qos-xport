@@ -6,7 +6,7 @@
 #include "component/console.hpp"
 #include "component/map_dumper.hpp"
 #include "component/scheduler.hpp"
-#include "runtime.hpp"
+#include "standalone/runtime.hpp"
 
 #include "game/game.hpp"
 #include "game/structs.IW4.hpp"
@@ -122,4 +122,6 @@ namespace mapents
 }
 
 REGISTER_COMPONENT(mapents::component)
+
+
 

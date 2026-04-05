@@ -5,7 +5,7 @@
 #include "filesystem.hpp"
 #include "gsc.hpp"
 #include "scheduler.hpp"
-#include "../runtime.hpp"
+#include "standalone/runtime.hpp"
 
 #include "game/game.hpp"
 
@@ -366,4 +366,6 @@ namespace gsc
 }
 
 REGISTER_COMPONENT(gsc::component)
+
+
 

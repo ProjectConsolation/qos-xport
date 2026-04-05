@@ -29,3 +29,5 @@ private:
 	std::vector<std::unordered_map<std::string, std::string>> entities;
 	void parse(std::string buffer);
 };
+
+

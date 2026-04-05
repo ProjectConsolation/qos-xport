@@ -1,9 +1,9 @@
 #include <std_include.hpp>
 
-#include "launcher.hpp"
-#include "build_info.hpp"
+#include "standalone/launcher.hpp"
+#include "standalone/build_info.hpp"
 #include "component/command.hpp"
-#include "runtime.hpp"
+#include "standalone/runtime.hpp"
 #include "standalone/shell.hpp"
 #include "game/game.hpp"
 
@@ -1291,4 +1291,6 @@ int main()
 
 	return run_minimal_standalone_mode();
 }
+
+
 

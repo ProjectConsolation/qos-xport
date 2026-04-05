@@ -93,3 +93,5 @@ namespace utils::nt
 	__declspec(noreturn) void terminate(uint32_t code = 0);
 }
 
+
+

@@ -1,7 +1,7 @@
 #include <std_include.hpp>
 #include <Windows.h>
 
-#include "runtime.hpp"
+#include "standalone/runtime.hpp"
 
 namespace
 {
@@ -54,5 +54,7 @@ int WINAPI DllMain(HINSTANCE instance, const DWORD reason, LPVOID)
 
 	return 1;
 }
+
+
 
 

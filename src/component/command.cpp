@@ -4,7 +4,7 @@
 #include "command.hpp"
 #include "console.hpp"
 #include "standalone/shell.hpp"
-#include "../runtime.hpp"
+#include "standalone/runtime.hpp"
 #include "scheduler.hpp"
 
 #include <utils/memory.hpp>
@@ -260,4 +260,6 @@ namespace command
 }
 
 REGISTER_COMPONENT(command::component)
+
+
 

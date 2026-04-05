@@ -27,3 +27,5 @@ namespace game
 	WEAK symbol<qos::scrVmPub_t> scrVmPub{ 0x11738488 };
 }
 
+
+

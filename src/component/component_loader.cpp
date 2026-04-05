@@ -1,6 +1,6 @@
 #include <std_include.hpp>
 #include "component_loader.hpp"
-#include "../runtime.hpp"
+#include "standalone/runtime.hpp"
 
 namespace
 {
@@ -158,4 +158,6 @@ std::vector<std::unique_ptr<component_interface>>& component_loader::get_compone
 
 	return *components;
 }
+
+
 

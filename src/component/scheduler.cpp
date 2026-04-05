@@ -2,7 +2,7 @@
 #include "component/component_loader.hpp"
 
 #include "scheduler.hpp"
-#include "../runtime.hpp"
+#include "standalone/runtime.hpp"
 #include "game/game.hpp"
 
 #include <utils/hook.hpp>
@@ -208,4 +208,6 @@ namespace scheduler
 }
 
 REGISTER_COMPONENT(scheduler::component)
+
+
 

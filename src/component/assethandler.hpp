@@ -17,3 +17,5 @@ namespace assethandler
 	std::size_t dump_all_assets_of_type(game::qos::XAssetType type, const std::string& filter = {});
 }
 
+
+

@@ -1,8 +1,8 @@
 #include <std_include.hpp>
 
 #include <TlHelp32.h>
-#include "launcher.hpp"
-#include "runtime.hpp"
+#include "standalone/launcher.hpp"
+#include "standalone/runtime.hpp"
 
 namespace
 {
@@ -421,4 +421,6 @@ int run_launcher_mode()
 
 	return 0;
 }
+
+
 

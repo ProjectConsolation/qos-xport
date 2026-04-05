@@ -8,3 +8,5 @@ namespace gsc
 	void add_method(const char* name, game::qos::method_t func, int type = 0);
 }
 
+
+

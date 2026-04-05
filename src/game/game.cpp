@@ -1,7 +1,7 @@
 #include <std_include.hpp>
 
 #include "component/console.hpp"
-#include "runtime.hpp"
+#include "standalone/runtime.hpp"
 
 #include "game/game.hpp"
 #include "game/structs.IW4.hpp"
@@ -302,4 +302,6 @@ namespace game
 		return answer;
 	}
 }
+
+
 
