@@ -9,13 +9,16 @@ namespace standalone::shell
 
 	void append_log_line(const std::string& line);
 	void append_input_log_line(const std::string& line);
+	std::string format_submitted_input_line(const std::string& line);
 
 	void host_print(const std::string& message);
 	void host_patch_print(const std::string& message);
 	void host_section_print(const std::string& message);
 
+	std::string make_section_banner(const std::string& title);
 	void write_console_line(const std::string& line);
 	void write_shell_line(const std::string& line);
+	void commit_shell_input_line(const std::string& line);
 	void render_shell_input_line(const std::string& line, size_t previous_length);
 	void clear_console_display();
 	void settle_shell_io();

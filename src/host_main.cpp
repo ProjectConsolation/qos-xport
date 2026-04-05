@@ -56,10 +56,12 @@ namespace
 	using standalone::shell::append_input_log_line;
 	using standalone::shell::append_log_line;
 	using standalone::shell::clear_console_display;
+	using standalone::shell::commit_shell_input_line;
 	using standalone::shell::flush_shell_input_buffer;
 	using standalone::shell::host_patch_print;
 	using standalone::shell::host_print;
 	using standalone::shell::host_section_print;
+	using standalone::shell::make_section_banner;
 	using standalone::shell::make_host_section_line;
 	using standalone::shell::render_shell_input_line;
 	using standalone::shell::settle_shell_io;
@@ -170,7 +172,7 @@ namespace
 
 			if (key == '\r')
 			{
-				write_shell_line("");
+				commit_shell_input_line(line);
 				return true;
 			}
 
@@ -675,24 +677,22 @@ namespace
 		}
 
 		const bool trusted_names = (source == zone_trace_manual);
-		host_section_print(make_host_section_line("[host:zone_count]", std::string(source_name) + " zone_count = " + std::to_string(zone_count)));
+		host_section_print(make_section_banner(std::string("zones: ") + source_name));
+		host_section_print(make_host_section_line("[host:zone_count]", "zone_count = " + std::to_string(zone_count)));
 		host_section_print(make_host_section_line("[host:zone_sync]", "sync = " + std::to_string(sync ? 1 : 0)));
-		host_section_print(make_host_section_line("[host:zones]", "======================="));
 		for (int i = 0; i < zone_count; ++i)
 		{
 			host_section_print(make_host_section_line("[host:zones]", describe_zone_name(zone_info[i].name, trusted_names)));
 		}
-		host_section_print(make_host_section_line("[host:zones]", "======================="));
 	}
 
 	void log_file_load_refs()
 	{
-		host_section_print(make_host_section_line("[host:refs]", "======================="));
+		host_section_print(make_section_banner("host refs"));
 		host_section_print(make_host_section_line("[host:refs]", "FS_Startup = 0x10272D80"));
 		host_section_print(make_host_section_line("[host:refs]", "ExecConfig = 0x103F5820"));
 		host_section_print(make_host_section_line("[host:refs]", "Scr_ReadFile_FastFile = 0x1022DF13"));
 		host_section_print(make_host_section_line("[host:refs]", "DB_LoadXAssets = 0x103E1CF0"));
-		host_section_print(make_host_section_line("[host:refs]", "======================="));
 	}
 
 	void reinforce_engine_imports()
@@ -700,10 +700,9 @@ namespace
 		utils::hook::set<void*>(game::game_offset(0x104761C4), reinterpret_cast<void*>(::SwitchToThread));
 		utils::hook::set<void*>(game::game_offset(0x10476344), reinterpret_cast<void*>(::timeGetTime));
 
-		host_section_print(make_host_section_line("[host:imports]", "======================="));
+		host_section_print(make_section_banner("host imports"));
 		host_section_print(make_host_section_line("[host:imports]", "SwitchToThread = " + hex_address(reinterpret_cast<std::uintptr_t>(*reinterpret_cast<void**>(game::game_offset(0x104761C4))))));
 		host_section_print(make_host_section_line("[host:imports]", "timeGetTime = " + hex_address(reinterpret_cast<std::uintptr_t>(*reinterpret_cast<void**>(game::game_offset(0x10476344))))));
-		host_section_print(make_host_section_line("[host:imports]", "======================="));
 	}
 
 	void perform_bootstrap_zone_load()
@@ -971,7 +970,7 @@ namespace
 		SetConsoleTitleA(build_info::get_window_title().c_str());
 
 		host_print("========== qos-xport initializing ==========");
-		host_print("loading jb_mp_s.dll...");
+		host_print("loading 'jb_mp_s.dll' ...");
 
 		const auto module = load_jb_mp_module_guarded();
 
@@ -979,24 +978,23 @@ namespace
 		{
 			if (g_module_load_exception_code.load() != 0)
 			{
-				fail_and_wait("exception while loading jb_mp_s.dll (0x" + hex_address(g_module_load_exception_code.load()) + ")");
+			fail_and_wait("exception while loading 'jb_mp_s.dll' (0x" + hex_address(g_module_load_exception_code.load()) + ")!");
 				return nullptr;
 			}
 
-			fail_and_wait("failed to load jb_mp_s.dll (" + std::to_string(GetLastError()) + ")");
+			fail_and_wait("failed to load 'jb_mp_s.dll' (" + std::to_string(GetLastError()) + ")!");
 			return nullptr;
 		}
 		game::mp_dll = module;
 
-		host_print("loaded jb_mp_s.dll");
+		host_print("loaded 'jb_mp_s.dll'!");
 		runtime::set_standalone_xport_mode(true);
 		g_engine_error_seen = false;
 		g_init_popup_seen = false;
 
 		try
 		{
-			host_section_print(make_host_section_line("[host:patch]", "======================="));
-			host_print("patching detours...");
+			host_section_print(make_section_banner("patching detours"));
 			apply_detour(g_xlive_patch_a, 0x10240B30, xlive_ret_one_stub);
 			apply_detour(g_xlive_patch_b, 0x10240A30, xlive_ret_one_stub);
 			apply_detour(g_splash_patch, 0x102C3280, ret_success_stub);
@@ -1022,8 +1020,7 @@ namespace
 			apply_detour(g_init_popup_hook, 0x10245050, init_popup_stub);
 			apply_detour(g_fs_startup_patch, 0x10272D80, fs_startup_host_stub);
 
-			host_section_print(make_host_section_line("[host:patch]", "======================="));
-			host_print("patching jumps...");
+			host_section_print(make_section_banner("patching jumps"));
 			apply_jump(0x1024D8E9, 0x1024D909);
 			apply_jump(0x103F7156, 0x103F7162);
 			apply_jump(0x103F7162, 0x103F71A7);
@@ -1031,13 +1028,11 @@ namespace
 			apply_jump(0x103F9BC1, 0x103F9BD7);
 			apply_jump(0x103F9B5A, 0x103F9B85);
 
-			host_section_print(make_host_section_line("[host:patch]", "======================="));
-			host_print("patching nops...");
+			host_section_print(make_section_banner("patching nops"));
 			apply_nop(0x102489A1, 5);
 			apply_nop(0x10245B68, 2);
 
-			host_section_print(make_host_section_line("[host:patch]", "======================="));
-			host_print("patching callsites...");
+			host_section_print(make_section_banner("patching callsites"));
 			apply_gfxconfig_callsite_patch();
 			host_patch_print("[patch:nop] 0x103F9A71 (5 bytes)");
 			utils::hook::nop(game::game_offset(0x103F9A71), 5);
@@ -1046,9 +1041,8 @@ namespace
 			host_patch_print("[patch:nop] 0x103209F8 (5 bytes)");
 			utils::hook::nop(game::game_offset(0x103209F8), 5);
 			reinforce_engine_imports();
-			host_section_print(make_host_section_line("[host:patch]", "======================="));
 			host_patch_print("[host:patch] all patches applied");
-			host_section_print(make_host_section_line("[host:patch]", "======================="));
+			host_section_print(make_section_banner("patches applied"));
 			log_file_load_refs();
 		}
 		catch (const std::exception& error)
