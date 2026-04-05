@@ -18,7 +18,7 @@ namespace
 	bool runtime_log_cleared = false;
 	std::atomic_bool standalone_xport_mode = false;
 
-	std::filesystem::path get_launcher_log_path()
+	std::filesystem::path build_log_path()
 	{
 		char module_path[MAX_PATH]{};
 		GetModuleFileNameA(nullptr, module_path, MAX_PATH);
@@ -30,37 +30,7 @@ namespace
 
 	void log_runtime_message(const std::string& message)
 	{
-		const auto line = "[runtime] " + message + "\r\n";
-		OutputDebugStringA(line.c_str());
-
-		const auto path = get_launcher_log_path();
-		if (!runtime_log_cleared)
-		{
-			runtime_log_cleared = true;
-		}
-
-		const auto handle = CreateFileA(
-			path.string().c_str(),
-			FILE_APPEND_DATA,
-			FILE_SHARE_READ | FILE_SHARE_WRITE,
-			nullptr,
-			OPEN_ALWAYS,
-			FILE_ATTRIBUTE_NORMAL,
-			nullptr
-		);
-
-		if (handle == INVALID_HANDLE_VALUE)
-		{
-			return;
-		}
-
-		const auto close_handle = gsl::finally([&]()
-		{
-			CloseHandle(handle);
-		});
-
-		DWORD bytes_written = 0;
-		WriteFile(handle, line.data(), static_cast<DWORD>(line.size()), &bytes_written, nullptr);
+		runtime::append_log_line("[runtime] " + message);
 	}
 
 	DECLSPEC_NORETURN void WINAPI exit_hook(const int code)
@@ -205,6 +175,46 @@ namespace runtime
 	bool is_initialized()
 	{
 		return runtime_initialized;
+	}
+
+	const std::filesystem::path& get_log_path()
+	{
+		static const auto path = build_log_path();
+		return path;
+	}
+
+	void append_log_line(const std::string& line)
+	{
+		const auto full_line = line + "\r\n";
+		OutputDebugStringA(full_line.c_str());
+
+		if (!runtime_log_cleared)
+		{
+			runtime_log_cleared = true;
+		}
+
+		const auto handle = CreateFileA(
+			get_log_path().string().c_str(),
+			FILE_APPEND_DATA,
+			FILE_SHARE_READ | FILE_SHARE_WRITE,
+			nullptr,
+			OPEN_ALWAYS,
+			FILE_ATTRIBUTE_NORMAL,
+			nullptr
+		);
+
+		if (handle == INVALID_HANDLE_VALUE)
+		{
+			return;
+		}
+
+		const auto close_handle = gsl::finally([&]()
+		{
+			CloseHandle(handle);
+		});
+
+		DWORD bytes_written = 0;
+		WriteFile(handle, full_line.data(), static_cast<DWORD>(full_line.size()), &bytes_written, nullptr);
 	}
 
 	std::mutex& get_output_mutex()

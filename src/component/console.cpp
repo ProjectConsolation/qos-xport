@@ -421,7 +421,7 @@ namespace console
 			return false;
 		}
 
-		component()
+		void post_load() override
 		{
 			if (!AttachConsole(ATTACH_PARENT_PROCESS))
 			{
@@ -431,10 +431,7 @@ namespace console
 			freopen_s((FILE**)stdin, "CONIN$", "r", stdin);
 			freopen_s((FILE**)stderr, "CONOUT$", "w", stderr);
 			freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
-		}
 
-		void post_load() override
-		{
 			// redirect console output to our console
 			printf_hook.create(printf, printf_stub);
 			com_printf_hook.create(game::game_offset(0x103F6400), com_printf_stub);
@@ -499,11 +496,20 @@ namespace console
 		void pre_destroy() override
 		{
 			con.kill = true;
-			SetEvent(con.kill_event);
+			if (con.kill_event)
+			{
+				SetEvent(con.kill_event);
+			}
 
 			if (con.thread.joinable())
 			{
 				con.thread.join();
+			}
+
+			if (con.kill_event)
+			{
+				CloseHandle(con.kill_event);
+				con.kill_event = nullptr;
 			}
 		}
 	};

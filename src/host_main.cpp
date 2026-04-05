@@ -6,7 +6,6 @@
 #include "runtime.hpp"
 #include "game/game.hpp"
 
-#include <iostream>
 #include <eh.h>
 #include <cstdlib>
 #include <conio.h>
@@ -239,13 +238,6 @@ namespace
 						host_print("engine thread exited with code " + std::to_string(exit_code));
 					}
 					return false;
-				}
-
-				if (std::cin.eof() || std::cin.fail())
-				{
-					std::cin.clear();
-					Sleep(50);
-					continue;
 				}
 
 				host_print("stdin closed unexpectedly");
@@ -513,44 +505,9 @@ namespace
 		return value;
 	}
 
-	std::filesystem::path get_host_log_path()
-	{
-		char path[MAX_PATH]{};
-		GetModuleFileNameA(nullptr, path, MAX_PATH);
-		auto base = std::filesystem::path(path).parent_path() / "qos-xport";
-		std::error_code ec;
-		std::filesystem::create_directories(base, ec);
-		return base / "qos-xport.log";
-	}
-
 	void append_log_line(const std::string& line)
 	{
-		const auto full_line = line + "\r\n";
-		OutputDebugStringA(full_line.c_str());
-
-		const auto path = get_host_log_path();
-		const auto handle = CreateFileA(
-			path.string().c_str(),
-			FILE_APPEND_DATA,
-			FILE_SHARE_READ | FILE_SHARE_WRITE,
-			nullptr,
-			OPEN_ALWAYS,
-			FILE_ATTRIBUTE_NORMAL,
-			nullptr
-		);
-
-		if (handle == INVALID_HANDLE_VALUE)
-		{
-			return;
-		}
-
-		const auto close_handle = gsl::finally([&]()
-		{
-			CloseHandle(handle);
-		});
-
-		DWORD bytes_written = 0;
-		WriteFile(handle, full_line.data(), static_cast<DWORD>(full_line.size()), &bytes_written, nullptr);
+		runtime::append_log_line(line);
 	}
 
 	std::string format_message(va_list* ap, const char* message)

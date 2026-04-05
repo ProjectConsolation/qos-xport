@@ -26,44 +26,9 @@ namespace
 		std::fflush(stdout);
 	}
 
-	std::filesystem::path get_launcher_log_path()
-	{
-		char module_path[MAX_PATH]{};
-		GetModuleFileNameA(nullptr, module_path, MAX_PATH);
-		auto path = std::filesystem::path(module_path).parent_path() / "qos-xport";
-		std::error_code ec;
-		std::filesystem::create_directories(path, ec);
-		return path / "qos-xport.log";
-	}
-
 	void log_component_message(const std::string& message)
 	{
-		const auto line = "[runtime] " + message + "\r\n";
-		OutputDebugStringA(line.c_str());
-
-		const auto path = get_launcher_log_path();
-		const auto handle = CreateFileA(
-			path.string().c_str(),
-			FILE_APPEND_DATA,
-			FILE_SHARE_READ | FILE_SHARE_WRITE,
-			nullptr,
-			OPEN_ALWAYS,
-			FILE_ATTRIBUTE_NORMAL,
-			nullptr
-		);
-
-		if (handle == INVALID_HANDLE_VALUE)
-		{
-			return;
-		}
-
-		const auto close_handle = gsl::finally([&]()
-		{
-			CloseHandle(handle);
-		});
-
-		DWORD bytes_written = 0;
-		WriteFile(handle, line.data(), static_cast<DWORD>(line.size()), &bytes_written, nullptr);
+		runtime::append_log_line("[runtime] " + message);
 	}
 
 	void print_component_console_progress(const char* phase, const std::string& component_name)

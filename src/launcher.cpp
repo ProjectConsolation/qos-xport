@@ -2,6 +2,7 @@
 
 #include <TlHelp32.h>
 #include "launcher.hpp"
+#include "runtime.hpp"
 
 namespace
 {
@@ -21,51 +22,16 @@ namespace
 
 	bool g_no_overwrite = false;
 
-	std::filesystem::path get_launcher_log_path()
-	{
-		char path[MAX_PATH]{};
-		GetModuleFileNameA(nullptr, path, MAX_PATH);
-		auto base = std::filesystem::path(path).parent_path() / "qos-xport";
-		std::error_code ec;
-		std::filesystem::create_directories(base, ec);
-		return base / "launcher.log";
-	}
-
 	void append_launcher_log(const std::string& message)
 	{
-		const auto line = "[QoS-xport]: " + message + "\r\n";
-		OutputDebugStringA(line.c_str());
-
-		const auto path = get_launcher_log_path();
-		const auto handle = CreateFileA(
-			path.string().c_str(),
-			FILE_APPEND_DATA,
-			FILE_SHARE_READ | FILE_SHARE_WRITE,
-			nullptr,
-			OPEN_ALWAYS,
-			FILE_ATTRIBUTE_NORMAL,
-			nullptr
-		);
-
-		if (handle == INVALID_HANDLE_VALUE)
-		{
-			return;
-		}
-
-		const auto close_handle = gsl::finally([&]()
-		{
-			CloseHandle(handle);
-		});
-
-		DWORD bytes_written = 0;
-		WriteFile(handle, line.data(), static_cast<DWORD>(line.size()), &bytes_written, nullptr);
+		runtime::append_log_line("[QoS-xport] " + message);
 	}
 
 	void launcher_print(const std::string& message)
 	{
-	std::printf("[QoS-xport]: %s\n", message.c_str());
-	std::fflush(stdout);
-	append_launcher_log(message);
+		std::printf("[QoS-xport] %s\n", message.c_str());
+		std::fflush(stdout);
+		append_launcher_log(message);
 	}
 
 	void launcher_debug(const std::string& message)
@@ -75,7 +41,7 @@ namespace
 
 	int fail_and_wait(const char* message)
 	{
-		std::fprintf(stderr, "[QoS-xport]: %s", message);
+		std::fprintf(stderr, "[QoS-xport] %s", message);
 		std::fprintf(stderr, "\nPress Enter to close...\n");
 		std::fflush(stderr);
 		append_launcher_log(message);
@@ -341,7 +307,7 @@ namespace
 
 int run_launcher_mode()
 {
-	const auto log_path = get_launcher_log_path();
+		const auto log_path = runtime::get_log_path();
 	if (!g_no_overwrite)
 	{
 		DeleteFileA(log_path.string().c_str());

@@ -20,44 +20,6 @@ namespace command
 		thread_local bool local_dispatch = false;
 		thread_local std::vector<std::string> local_args;
 
-		std::filesystem::path get_launcher_log_path()
-		{
-			char module_path[MAX_PATH]{};
-			GetModuleFileNameA(nullptr, module_path, MAX_PATH);
-			auto path = std::filesystem::path(module_path).parent_path() / "qos-xport";
-			std::error_code ec;
-			std::filesystem::create_directories(path, ec);
-			return path / "qos-xport.log";
-		}
-
-		void append_standalone_log_line(const std::string& line)
-		{
-			const auto path = get_launcher_log_path();
-			const auto handle = CreateFileA(
-				path.string().c_str(),
-				FILE_APPEND_DATA,
-				FILE_SHARE_READ | FILE_SHARE_WRITE,
-				nullptr,
-				OPEN_ALWAYS,
-				FILE_ATTRIBUTE_NORMAL,
-				nullptr
-			);
-
-			if (handle == INVALID_HANDLE_VALUE)
-			{
-				return;
-			}
-
-			const auto close_handle = gsl::finally([&]()
-			{
-				CloseHandle(handle);
-			});
-
-			const auto with_newline = line + "\r\n";
-			DWORD bytes_written = 0;
-			WriteFile(handle, with_newline.data(), static_cast<DWORD>(with_newline.size()), &bytes_written, nullptr);
-		}
-
 		void print_command_line(const std::string& line)
 		{
 			if (!runtime::is_standalone_xport_mode())
@@ -92,7 +54,7 @@ namespace command
 				std::fflush(stdout);
 			}
 
-			append_standalone_log_line(line);
+			runtime::append_log_line(line);
 		}
 
 		void main_handler()
