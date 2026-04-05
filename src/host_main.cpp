@@ -58,6 +58,7 @@ namespace
 	void host_print(const std::string& message);
 	void write_console_line(const std::string& line);
 	void write_shell_prompt();
+	void write_shell_line(const std::string& line);
 	void host_patch_print(const std::string& message);
 	void host_section_print(const std::string& message);
 	bool should_suppress_engine_error(const std::string& message);
@@ -93,12 +94,11 @@ namespace
 
 	void print_init_complete_banner()
 	{
-		std::lock_guard _(runtime::get_output_mutex());
-		write_console_line("");
-		write_console_line("");
-		write_console_line("");
-		write_console_line("[QoS-xport] =========== initialization complete =============");
-		write_console_line("[QoS-xport] type 'help' for a list of commands, or 'quit' to exit");
+		write_shell_line("");
+		write_shell_line("");
+		write_shell_line("");
+		write_shell_line("[QoS-xport] =========== initialization complete =============");
+		write_shell_line("[QoS-xport] type 'help' for a list of commands, or 'quit' to exit");
 		append_log_line("[host] =========== qos-xport initialization complete =============");
 		append_log_line("[host] type 'help' for a list of commands, or 'quit' to exit");
 	}
@@ -539,6 +539,13 @@ namespace
 
 		std::fwrite(k_shell_prompt, 1, std::strlen(k_shell_prompt), stdout);
 		std::fflush(stdout);
+	}
+
+	void write_shell_line(const std::string& line)
+	{
+		std::lock_guard _(runtime::get_output_mutex());
+		std::cout << line << "\n";
+		std::cout.flush();
 	}
 
 	std::string make_host_section_line(const std::string& label, const std::string& message)

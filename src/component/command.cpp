@@ -6,6 +6,7 @@
 #include "../runtime.hpp"
 #include "scheduler.hpp"
 
+#include <iostream>
 #include <utils/memory.hpp>
 #include <utils/string.hpp>
 
