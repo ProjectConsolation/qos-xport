@@ -143,6 +143,7 @@ workspace "qos-exp"
 		language "C++"
 		targetname "xport"
 		linkoptions { "/DEF:../src/xport.def" }
+		links { "winmm" }
 		defines { "QOS_XPORT_AUTO_INIT" }
 
 		files
@@ -186,6 +187,7 @@ workspace "qos-exp"
 		kind "ConsoleApp"
 		language "C++"
 		targetname "QoS-xport"
+		links { "winmm" }
 		linkoptions { "/MANIFESTUAC:\"level='requireAdministrator' uiAccess='false'\"" }
 
 		files
