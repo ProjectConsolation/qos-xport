@@ -6,6 +6,7 @@
 #include "component/console.hpp"
 #include "component/map_dumper.hpp"
 #include "component/scheduler.hpp"
+#include "runtime.hpp"
 
 #include "game/game.hpp"
 #include "game/structs.IW4.hpp"
@@ -70,10 +71,15 @@ namespace mapents
 				return false;
 			}
 
-			void post_load() override
+		void post_load() override
+		{
+			if (runtime::is_standalone_xport_mode())
 			{
-				scheduler::once([&]()
-					{
+				return;
+			}
+
+			scheduler::once([&]()
+			{
 						command::add("dumpmapents", [](const command::params& params)
 						{
 							if (params.size() < 2)
