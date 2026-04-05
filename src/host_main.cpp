@@ -59,6 +59,7 @@ namespace
 	void write_console_line(const std::string& line);
 	void write_shell_prompt();
 	void write_shell_line(const std::string& line);
+	void clear_console_display();
 	void host_patch_print(const std::string& message);
 	void host_section_print(const std::string& message);
 	bool should_suppress_engine_error(const std::string& message);
@@ -94,6 +95,7 @@ namespace
 
 	void print_init_complete_banner()
 	{
+		clear_console_display();
 		write_shell_line("");
 		write_shell_line("");
 		write_shell_line("");
@@ -546,6 +548,30 @@ namespace
 		std::lock_guard _(runtime::get_output_mutex());
 		std::cout << line << "\n";
 		std::cout.flush();
+	}
+
+	void clear_console_display()
+	{
+		std::lock_guard _(runtime::get_output_mutex());
+
+		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
+		if (handle == INVALID_HANDLE_VALUE || handle == nullptr)
+		{
+			return;
+		}
+
+		CONSOLE_SCREEN_BUFFER_INFO info{};
+		if (!GetConsoleScreenBufferInfo(handle, &info))
+		{
+			return;
+		}
+
+		const COORD home{ 0, 0 };
+		const auto cell_count = static_cast<DWORD>(info.dwSize.X) * static_cast<DWORD>(info.dwSize.Y);
+		DWORD written = 0;
+		FillConsoleOutputCharacterA(handle, ' ', cell_count, home, &written);
+		FillConsoleOutputAttribute(handle, info.wAttributes, cell_count, home, &written);
+		SetConsoleCursorPosition(handle, home);
 	}
 
 	std::string make_host_section_line(const std::string& label, const std::string& message)
