@@ -372,14 +372,6 @@ namespace standalone::shell
 			}
 		}
 
-		if (!g_console_input_handle || g_console_input_handle == INVALID_HANDLE_VALUE)
-		{
-			const auto handle = GetStdHandle(STD_INPUT_HANDLE);
-			if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
-			{
-				g_console_input_handle = handle;
-			}
-		}
 	}
 
 	HANDLE get_console_output_handle()
@@ -390,7 +382,12 @@ namespace standalone::shell
 
 	HANDLE get_console_input_handle()
 	{
-		capture_console_handles();
+		const auto handle = GetStdHandle(STD_INPUT_HANDLE);
+		if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
+		{
+			g_console_input_handle = handle;
+		}
+
 		return g_console_input_handle;
 	}
 

@@ -259,9 +259,10 @@ namespace
 				continue;
 			}
 
-			const auto input_wait = WaitForSingleObject(input_handle, 10);
-			if (input_wait != WAIT_OBJECT_0)
+			DWORD pending_events = 0;
+			if (!GetNumberOfConsoleInputEvents(input_handle, &pending_events) || pending_events == 0)
 			{
+				Sleep(10);
 				continue;
 			}
 
@@ -841,39 +842,29 @@ namespace
 
 		const auto message = std::string("[debug:wait] attach debugger now, or click enter to continue without debugging (") + stage + ")";
 		host_section_print(message);
-		activate_debug_wait_input_mode();
-		const auto restore_debug_input = gsl::finally([]()
-		{
-			restore_debug_wait_input_mode();
-		});
-
-		const auto input_handle = get_console_input_handle();
+		SHORT last_enter_state = 0;
 		while (!IsDebuggerPresent())
 		{
 			SetConsoleTitleA(build_info::get_window_title().c_str());
-			if (input_handle != INVALID_HANDLE_VALUE && input_handle != nullptr)
+
+			const auto enter_state = GetAsyncKeyState(VK_RETURN);
+			const auto enter_down = (enter_state & 0x8000) != 0;
+			const auto enter_was_down = (last_enter_state & 0x8000) != 0;
+			last_enter_state = enter_state;
+
+			if (enter_down && !enter_was_down)
 			{
-				const auto input_wait = WaitForSingleObject(input_handle, 100);
-				if (input_wait == WAIT_OBJECT_0)
+				if (const auto input_handle = get_console_input_handle();
+					input_handle != INVALID_HANDLE_VALUE && input_handle != nullptr)
 				{
-					INPUT_RECORD record{};
-					DWORD event_count = 0;
-					if (ReadConsoleInputA(input_handle, &record, 1, &event_count) && event_count == 1)
-					{
-						if (record.EventType == KEY_EVENT
-							&& record.Event.KeyEvent.bKeyDown
-							&& record.Event.KeyEvent.wVirtualKeyCode == VK_RETURN)
-						{
-							host_section_print("[debug:wait] continuing without debugger");
-							return;
-						}
-					}
+					FlushConsoleInputBuffer(input_handle);
 				}
+
+				host_section_print("[debug:wait] continuing without debugger");
+				return;
 			}
-			else
-			{
-				Sleep(100);
-			}
+
+			Sleep(50);
 		}
 
 		host_section_print(std::string("[debug:wait] debugger attached (") + stage + ")");
