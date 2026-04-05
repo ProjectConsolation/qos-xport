@@ -949,7 +949,7 @@ namespace
 		}
 	}
 
-	int run_standalone_mode()
+	HMODULE prepare_standalone_host()
 	{
 		const auto log_path = get_host_log_path();
 		DeleteFileA(log_path.string().c_str());
@@ -967,10 +967,12 @@ namespace
 		{
 			if (g_module_load_exception_code.load() != 0)
 			{
-				return fail_and_wait("exception while loading jb_mp_s.dll (0x" + hex_address(g_module_load_exception_code.load()) + ")");
+				fail_and_wait("exception while loading jb_mp_s.dll (0x" + hex_address(g_module_load_exception_code.load()) + ")");
+				return nullptr;
 			}
 
-			return fail_and_wait("failed to load jb_mp_s.dll (" + std::to_string(GetLastError()) + ")");
+			fail_and_wait("failed to load jb_mp_s.dll (" + std::to_string(GetLastError()) + ")");
+			return nullptr;
 		}
 		game::mp_dll = module;
 
@@ -1039,11 +1041,81 @@ namespace
 		}
 		catch (const std::exception& error)
 		{
-			return fail_and_wait(std::string("early patch stage failed: ") + error.what());
+			fail_and_wait(std::string("early patch stage failed: ") + error.what());
+			return nullptr;
 		}
 		catch (...)
 		{
-			return fail_and_wait("early patch stage failed with unknown exception");
+			fail_and_wait("early patch stage failed with unknown exception");
+			return nullptr;
+		}
+
+		return module;
+	}
+
+	int run_minimal_standalone_mode()
+	{
+		const auto module = prepare_standalone_host();
+		if (!module)
+		{
+			return 1;
+		}
+
+		(void)module;
+		wait_for_debugger_if_requested("pre-runtime");
+		host_print("using minimal standalone bootstrap");
+
+		if (!runtime::initialize(true))
+		{
+			return fail_and_wait("runtime initialization failed");
+		}
+
+		wait_for_debugger_if_requested("post-runtime");
+
+		write_console_line("");
+		write_console_line("");
+		write_console_line("");
+		write_console_line("[QoS-xport] =========== initialization complete =============");
+		write_console_line("[QoS-xport] type 'help' for a list of commands, or 'quit' to exit");
+		append_log_line("[host] initialization complete");
+		append_log_line("[host] type 'help' for a list of commands, or 'quit' to exit");
+
+		std::string line;
+		while (true)
+		{
+			if (!std::getline(std::cin, line))
+			{
+				if (std::cin.eof())
+				{
+					break;
+				}
+
+				std::cin.clear();
+				Sleep(50);
+				continue;
+			}
+
+			if (line == "quit" || line == "exit")
+			{
+				break;
+			}
+
+			if (!command::execute_local(line))
+			{
+				host_print("engine command dispatch is unavailable in minimal bootstrap mode");
+			}
+		}
+
+		runtime::shutdown();
+		return 0;
+	}
+
+	int run_legacy_startmp_mode()
+	{
+		const auto module = prepare_standalone_host();
+		if (!module)
+		{
+			return 1;
 		}
 
 		wait_for_debugger_if_requested("pre-engine");
@@ -1258,6 +1330,7 @@ namespace
 int main()
 {
 	int argc = 0;
+	bool use_legacy_startmp = false;
 	auto* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
 	if (argv)
 	{
@@ -1273,6 +1346,10 @@ int main()
 			{
 				return run_launcher_mode();
 			}
+			if (arg == L"--legacy-startmp")
+			{
+				use_legacy_startmp = true;
+			}
 			if (arg == L"-debug_env")
 			{
 				g_debugbreak_bootstrap = true;
@@ -1280,5 +1357,10 @@ int main()
 		}
 	}
 
-	return run_standalone_mode();
+	if (use_legacy_startmp)
+	{
+		return run_legacy_startmp_mode();
+	}
+
+	return run_minimal_standalone_mode();
 }
