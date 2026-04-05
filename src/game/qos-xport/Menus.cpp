@@ -1049,7 +1049,7 @@ namespace menus
 
 					console::info("dumped '%s'\n", name);
 				});
-				command::set_help("dumpmenu", "Dump one menu asset to a .menu file.", "dumpmenu main_text");
+				command::set_help("dumpmenu", "Dump one menu asset to a .menu file.", "dumpmenu ui_mapname_text");
 
 				command::add("dumpmenulist", [](const command::params& params)
 					{

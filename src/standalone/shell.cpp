@@ -53,6 +53,13 @@ namespace standalone::shell
 			WORD color;
 		};
 
+		struct prompt_state
+		{
+			bool active = false;
+			std::string line;
+			size_t previous_length = 0;
+		};
+
 		constexpr std::array k_tag_rules =
 		{
 			tag_rule{ "qos-xport", { k_color_qos_major, k_color_qos_minor, k_color_white } },
@@ -70,6 +77,8 @@ namespace standalone::shell
 			tag_variant_rule{ "engine:init", FOREGROUND_GREEN },
 			tag_variant_rule{ "engine:warn", k_color_debug_major },
 		};
+
+		prompt_state g_prompt_state{};
 
 		std::string lower_copy(std::string value)
 		{
@@ -95,6 +104,58 @@ namespace standalone::shell
 		void set_console_color(HANDLE handle, WORD color)
 		{
 			SetConsoleTextAttribute(handle, color);
+		}
+
+		void clear_console_row(HANDLE handle, const COORD row_start, const WORD attributes)
+		{
+			CONSOLE_SCREEN_BUFFER_INFO info{};
+			if (!GetConsoleScreenBufferInfo(handle, &info))
+			{
+				return;
+			}
+
+			DWORD written = 0;
+			FillConsoleOutputCharacterA(handle, ' ', info.dwSize.X, row_start, &written);
+			FillConsoleOutputAttribute(handle, attributes, info.dwSize.X, row_start, &written);
+			SetConsoleCursorPosition(handle, row_start);
+		}
+
+		void draw_prompt_locked(HANDLE handle, const WORD original_attributes)
+		{
+			DWORD written = 0;
+			SetConsoleTextAttribute(handle, FOREGROUND_RED);
+			WriteConsoleA(handle, k_prompt_name, static_cast<DWORD>(std::strlen(k_prompt_name)), &written, nullptr);
+			SetConsoleTextAttribute(handle, k_color_white);
+			WriteConsoleA(handle, k_prompt_suffix, static_cast<DWORD>(std::strlen(k_prompt_suffix)), &written, nullptr);
+			if (!g_prompt_state.line.empty())
+			{
+				WriteConsoleA(handle, g_prompt_state.line.data(), static_cast<DWORD>(g_prompt_state.line.size()), &written, nullptr);
+			}
+			SetConsoleTextAttribute(handle, original_attributes);
+		}
+
+		void redraw_prompt_locked(HANDLE handle, const WORD original_attributes)
+		{
+			if (!g_prompt_state.active)
+			{
+				return;
+			}
+
+			CONSOLE_SCREEN_BUFFER_INFO info{};
+			if (!GetConsoleScreenBufferInfo(handle, &info))
+			{
+				return;
+			}
+
+			const COORD row_start{ 0, info.dwCursorPosition.Y };
+			clear_console_row(handle, row_start, original_attributes);
+			draw_prompt_locked(handle, original_attributes);
+			const COORD cursor
+			{
+				static_cast<SHORT>(std::strlen(k_prompt_name) + std::strlen(k_prompt_suffix) + g_prompt_state.line.size()),
+				row_start.Y
+			};
+			SetConsoleCursorPosition(handle, cursor);
 		}
 
 		std::optional<tag_palette> get_family_palette(const std::string& family)
@@ -212,11 +273,12 @@ namespace standalone::shell
 				body_color = k_color_error;
 			}
 
-			set_console_color(handle, k_color_white);
+			const auto bracket_color = family == "qos-xport" ? k_color_white : tag_color;
+			set_console_color(handle, bracket_color);
 			write_console_text(handle, "[");
 			set_console_color(handle, tag_color);
 			write_console_text(handle, tag);
-			set_console_color(handle, k_color_white);
+			set_console_color(handle, bracket_color);
 			write_console_text(handle, "]");
 
 			if (body.empty())
@@ -304,6 +366,12 @@ namespace standalone::shell
 					original_attributes = info.wAttributes;
 				}
 
+				if (g_prompt_state.active)
+				{
+					const COORD row_start{ 0, info.dwCursorPosition.Y };
+					clear_console_row(handle, row_start, original_attributes);
+				}
+
 				if (!line.empty() && line.front() == '[' && line.find(']') != std::string::npos)
 				{
 					write_tagged_line(handle, line, original_attributes);
@@ -330,6 +398,11 @@ namespace standalone::shell
 
 					set_console_color(handle, color);
 					write_console_text(handle, line + "\r\n");
+				}
+
+				if (g_prompt_state.active)
+				{
+					redraw_prompt_locked(handle, original_attributes);
 				}
 
 				set_console_color(handle, original_attributes);
@@ -372,6 +445,9 @@ namespace standalone::shell
 	void render_shell_prompt()
 	{
 		std::lock_guard _(runtime::get_output_mutex());
+		g_prompt_state.active = true;
+		g_prompt_state.line.clear();
+		g_prompt_state.previous_length = 0;
 
 		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
 		if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
@@ -386,12 +462,7 @@ namespace standalone::shell
 					original_attributes = info.wAttributes;
 				}
 
-				DWORD written = 0;
-				SetConsoleTextAttribute(handle, FOREGROUND_RED);
-				WriteConsoleA(handle, k_prompt_name, static_cast<DWORD>(std::strlen(k_prompt_name)), &written, nullptr);
-				SetConsoleTextAttribute(handle, k_color_white);
-				WriteConsoleA(handle, k_prompt_suffix, static_cast<DWORD>(std::strlen(k_prompt_suffix)), &written, nullptr);
-				SetConsoleTextAttribute(handle, original_attributes);
+				draw_prompt_locked(handle, original_attributes);
 				return;
 			}
 		}
@@ -403,6 +474,9 @@ namespace standalone::shell
 	void commit_shell_input_line(const std::string& line)
 	{
 		std::lock_guard _(runtime::get_output_mutex());
+		g_prompt_state.active = false;
+		g_prompt_state.line.clear();
+		g_prompt_state.previous_length = 0;
 
 		const auto committed = format_submitted_input_line(line);
 		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -444,6 +518,9 @@ namespace standalone::shell
 	void render_shell_input_line(const std::string& line, size_t previous_length)
 	{
 		std::lock_guard _(runtime::get_output_mutex());
+		g_prompt_state.active = true;
+		g_prompt_state.line = line;
+		g_prompt_state.previous_length = std::max(previous_length, line.size());
 
 		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
 		if (handle != INVALID_HANDLE_VALUE && handle != nullptr)
@@ -476,9 +553,9 @@ namespace standalone::shell
 					WriteConsoleA(handle, line.data(), static_cast<DWORD>(line.size()), &written, nullptr);
 				}
 
-				if (previous_length > line.size())
+				if (g_prompt_state.previous_length > line.size())
 				{
-					const std::string padding(previous_length - line.size(), ' ');
+					const std::string padding(g_prompt_state.previous_length - line.size(), ' ');
 					WriteConsoleA(handle, padding.data(), static_cast<DWORD>(padding.size()), &written, nullptr);
 				}
 
@@ -494,9 +571,9 @@ namespace standalone::shell
 		std::fwrite("\r", 1, 1, stdout);
 		std::fwrite(k_shell_prompt, 1, std::strlen(k_shell_prompt), stdout);
 		std::fwrite(line.data(), 1, line.size(), stdout);
-		if (previous_length > line.size())
+		if (g_prompt_state.previous_length > line.size())
 		{
-			const std::string padding(previous_length - line.size(), ' ');
+			const std::string padding(g_prompt_state.previous_length - line.size(), ' ');
 			std::fwrite(padding.data(), 1, padding.size(), stdout);
 		}
 		std::fflush(stdout);
@@ -505,6 +582,9 @@ namespace standalone::shell
 	void clear_console_display()
 	{
 		std::lock_guard _(runtime::get_output_mutex());
+		g_prompt_state.active = false;
+		g_prompt_state.line.clear();
+		g_prompt_state.previous_length = 0;
 
 		const auto handle = GetStdHandle(STD_OUTPUT_HANDLE);
 		if (handle == INVALID_HANDLE_VALUE || handle == nullptr)

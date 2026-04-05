@@ -178,7 +178,7 @@ namespace material
 
 					console::info("dumped '%s' for IW4\n", name);
 				});
-				command::set_help("dumpmaterial", "Dump a loaded material asset.", "dumpmaterial compass_map_mp_backlot");
+				command::set_help("dumpmaterial", "Dump a loaded material asset.", "dumpmaterial compass_map_default");
 			}, scheduler::main);
 		}
 

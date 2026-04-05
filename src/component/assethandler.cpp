@@ -69,6 +69,16 @@ namespace assethandler
 				return component->get_type() == type;
 			});
 		}
+
+		void sync_assets_if_needed()
+		{
+			if (runtime::is_standalone_xport_mode())
+			{
+				return;
+			}
+
+			game::DB_SyncXAssets();
+		}
 	}
 
 	struct processed_asset
@@ -246,7 +256,7 @@ namespace assethandler
 
 	bool dump_asset_by_name(const game::qos::XAssetType type, const std::string& name)
 	{
-		game::DB_SyncXAssets();
+		sync_assets_if_needed();
 
 		const auto header = game::DB_FindXAssetHeader(type, name.data());
 		if (!header.data || game::DB_IsXAssetDefault(type, name.data()))
@@ -259,7 +269,7 @@ namespace assethandler
 
 	std::size_t dump_all_assets_of_type(const game::qos::XAssetType type, const std::string& filter)
 	{
-		game::DB_SyncXAssets();
+		sync_assets_if_needed();
 
 		std::size_t dumped = 0;
 		const auto lowered_filter = utils::string::to_lower(filter);
@@ -355,7 +365,7 @@ namespace assethandler
 
 					console::info("dumped %s '%s'\n", type_to_string(*type), name.data());
 				});
-				command::set_help("dumpasset", "Dump one loaded asset by QoS type and name.", "dumpasset material weapon_ak47");
+				command::set_help("dumpasset", "Dump one loaded asset by QoS type and name.", "dumpasset material compass_map_default");
 
 				command::add("dumpallassets", [](const command::params& params)
 				{
@@ -382,7 +392,7 @@ namespace assethandler
 					const auto dumped = dump_all_assets_of_type(*type, filter);
 					console::info("dumped %zu %s asset(s)\n", dumped, type_to_string(*type));
 				});
-				command::set_help("dumpallassets", "Dump every loaded asset of a given type, optionally filtered by name.", "dumpallassets material compass_");
+				command::set_help("dumpallassets", "Dump every loaded asset of a given type, optionally filtered by name.", "dumpallassets menu ui_");
 			}, scheduler::main);
 		}
 

@@ -171,7 +171,7 @@ namespace gfximage
 
 					console::info("dumped '%s' for IW4\n", name);
 				});
-				command::set_help("dumpgfximage", "Dump a loaded image asset.", "dumpgfximage weapon_ak47_col");
+				command::set_help("dumpgfximage", "Dump a loaded image asset.", "dumpgfximage compassping_friendly");
 			}, scheduler::main);
 		}
 

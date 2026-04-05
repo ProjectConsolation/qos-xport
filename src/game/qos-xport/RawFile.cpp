@@ -60,6 +60,25 @@ namespace rawfile
 						return;
 					}
 
+					if (runtime::is_standalone_xport_mode())
+					{
+						const auto header = game::DB_FindXAssetHeader_Internal(game::qos::ASSET_TYPE_RAWFILE, name, false);
+						if (!header.data || game::DB_IsXAssetDefault(game::qos::ASSET_TYPE_RAWFILE, name))
+						{
+							command::print_line(std::string("dumprawfile failed on '") + name + "'");
+							return;
+						}
+
+						if (!assethandler::dump_asset(game::qos::ASSET_TYPE_RAWFILE, header))
+						{
+							command::print_line(std::string("dumprawfile failed on '") + name + "'");
+							return;
+						}
+
+						command::print_line(std::string("dumped '") + name + "' for IW4");
+						return;
+					}
+
 					if (!assethandler::dump_asset_by_name(game::qos::ASSET_TYPE_RAWFILE, name))
 					{
 						command::print_line(std::string("dumprawfile failed on '") + name + "'");
@@ -68,7 +87,7 @@ namespace rawfile
 
 					command::print_line(std::string("dumped '") + name + "' for IW4");
 				});
-				command::set_help("dumprawfile", "Dump one loaded rawfile asset, or '*' to dump all loaded rawfiles.", "dumprawfile maps/mp/mp_backlot.gsc");
+				command::set_help("dumprawfile", "Dump one loaded rawfile asset, or '*' to dump all loaded rawfiles.", "dumprawfile maps/_art.gsc");
 			}, scheduler::main);
 		}
 

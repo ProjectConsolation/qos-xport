@@ -67,9 +67,7 @@ namespace
 	using standalone::shell::host_section_print;
 	using standalone::shell::make_section_banner;
 	using standalone::shell::make_host_section_line;
-	using standalone::shell::render_shell_prompt;
 	using standalone::shell::render_shell_input_line;
-	using standalone::shell::settle_shell_io;
 	using standalone::shell::write_console_line;
 	using standalone::shell::write_shell_line;
 	bool should_suppress_engine_error(const std::string& message);
@@ -138,8 +136,8 @@ namespace
 		DWORD shell_mode = mode;
 		shell_mode |= ENABLE_EXTENDED_FLAGS;
 		shell_mode |= ENABLE_PROCESSED_INPUT;
-		shell_mode |= ENABLE_ECHO_INPUT;
-		shell_mode |= ENABLE_LINE_INPUT;
+		shell_mode &= ~ENABLE_ECHO_INPUT;
+		shell_mode &= ~ENABLE_LINE_INPUT;
 		shell_mode &= ~ENABLE_MOUSE_INPUT;
 		shell_mode &= ~ENABLE_QUICK_EDIT_MODE;
 
@@ -242,9 +240,9 @@ namespace
 		line.clear();
 		engine_terminated = false;
 		const auto input_handle = GetStdHandle(STD_INPUT_HANDLE);
+		size_t previous_length = 0;
 
-		settle_shell_io();
-		render_shell_prompt();
+		render_shell_input_line(line, previous_length);
 
 		while (true)
 		{
@@ -270,36 +268,67 @@ namespace
 				continue;
 			}
 
-			wchar_t wide_buffer[512]{};
-			DWORD chars_read = 0;
-			if (!ReadConsoleW(input_handle, wide_buffer, static_cast<DWORD>(std::size(wide_buffer) - 1), &chars_read, nullptr))
+			INPUT_RECORD record{};
+			DWORD event_count = 0;
+			if (!ReadConsoleInputA(input_handle, &record, 1, &event_count) || event_count != 1)
 			{
 				continue;
 			}
 
-			if (chars_read == 0)
+			if (record.EventType == WINDOW_BUFFER_SIZE_EVENT)
+			{
+				render_shell_input_line(line, previous_length);
+				continue;
+			}
+
+			if (record.EventType != KEY_EVENT || !record.Event.KeyEvent.bKeyDown)
 			{
 				continue;
 			}
 
-			std::wstring wide_line(wide_buffer, chars_read);
-			while (!wide_line.empty() && (wide_line.back() == L'\r' || wide_line.back() == L'\n'))
+			switch (record.Event.KeyEvent.wVirtualKeyCode)
 			{
-				wide_line.pop_back();
-			}
+			case VK_RETURN:
+				commit_shell_input_line(line);
+				return true;
 
-			if (!wide_line.empty())
-			{
-				const auto required = WideCharToMultiByte(CP_UTF8, 0, wide_line.c_str(), static_cast<int>(wide_line.size()), nullptr, 0, nullptr, nullptr);
-				if (required > 0)
+			case VK_BACK:
+				if (!line.empty())
 				{
-					line.resize(required);
-					WideCharToMultiByte(CP_UTF8, 0, wide_line.c_str(), static_cast<int>(wide_line.size()), line.data(), required, nullptr, nullptr);
+					previous_length = std::max(previous_length, line.size());
+					line.pop_back();
+					render_shell_input_line(line, previous_length);
 				}
-			}
+				break;
 
-			commit_shell_input_line(line);
-			return true;
+			case VK_ESCAPE:
+				if (!line.empty())
+				{
+					previous_length = std::max(previous_length, line.size());
+					line.clear();
+					render_shell_input_line(line, previous_length);
+				}
+				break;
+
+			default:
+			{
+				const auto c = record.Event.KeyEvent.uChar.AsciiChar;
+				if (!c || static_cast<unsigned char>(c) < 32)
+				{
+					break;
+				}
+
+				if (line.size() >= 510)
+				{
+					break;
+				}
+
+				line.push_back(c);
+				previous_length = std::max(previous_length, line.size());
+				render_shell_input_line(line, previous_length);
+				break;
+			}
+			}
 		}
 	}
 
@@ -350,7 +379,6 @@ namespace
 				return true;
 			}
 
-			settle_shell_io();
 		}
 	}
 
