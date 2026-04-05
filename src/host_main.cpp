@@ -963,7 +963,7 @@ namespace
 
 	HMODULE prepare_standalone_host()
 	{
-		const auto log_path = get_host_log_path();
+		const auto& log_path = runtime::get_log_path();
 		DeleteFileA(log_path.string().c_str());
 		set_terminate(host_terminate_handler);
 		_set_invalid_parameter_handler(host_invalid_parameter_handler);
